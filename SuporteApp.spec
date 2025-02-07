@@ -5,7 +5,7 @@ a = Analysis(
     ['SuporteApp.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('ico.ico', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -35,5 +35,6 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['C:\\dist\\Versão Suporte - 2.0\\Script\\Arquivos do programa\\ico.ico'],
+    version='version_info.txt',
+    icon=['ico.ico'],
 )
