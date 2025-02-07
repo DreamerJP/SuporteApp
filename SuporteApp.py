@@ -5,6 +5,10 @@ from tkinter import simpledialog, scrolledtext, filedialog, ttk, messagebox
 import json
 import pygame
 import random
+import subprocess
+import tempfile
+import requests
+import time
 
 # Constantes para cores e caminhos de arquivo
 DEFAULT_BG_COLOR = "#2C3E50"
@@ -20,6 +24,130 @@ DEFAULT_BG_IMAGE_PATH = "background.png"
 CONFIG_FILE = "config.txt"
 TEXTS_FILE = "texts.json"
 NOTEPAD_FILE = "notepad.json"
+
+class Updater:
+    def __init__(self, current_version):
+        self.current_version = current_version
+        self.version_url = "https://raw.githubusercontent.com/DreamerJP/SuporteApp/main/version.json"
+
+    def check_for_updates(self):
+        try:
+            response = requests.get(self.version_url)
+            response.raise_for_status()
+            version_info = response.json()
+            if version_info["version"] > self.current_version:
+                return version_info
+            return None
+        except Exception as e:
+            print(f"Erro ao verificar atualizações: {e}")
+            return None
+
+    def download_and_install(self, download_url):
+        try:
+            current_exe = sys.executable
+            print(f"[DEBUG] Caminho atual: {current_exe}")
+
+            response = requests.get(download_url)
+            response.raise_for_status()
+            
+            with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as temp_file:
+                temp_file.write(response.content)
+                new_exe_path = temp_file.name
+                print(f"[DEBUG] Novo executável: {new_exe_path}")
+
+            bat_content = self.generate_bat_script(current_exe, new_exe_path)
+            bat_path = self.write_and_validate_bat(bat_content, current_exe, new_exe_path)
+            
+            subprocess.Popen(
+                [bat_path],
+                shell=True,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+            
+            time.sleep(2)  # Pequena pausa para garantir que o script BAT seja iniciado
+            sys.exit(0)
+        except Exception as e:
+            print(f"Falha crítica na atualização: {str(e)}")
+            messagebox.showerror("Erro de Atualização", f"Detalhes: {str(e)}")
+
+    def generate_bat_script(self, old_exe, new_exe):
+        """Gera o conteúdo do BAT com caminhos embutidos"""
+        old_exe = os.path.normpath(os.path.abspath(old_exe))
+        new_exe = os.path.normpath(os.path.abspath(new_exe))
+        return f"""@@echo off
+chcp 65001 >nul
+setlocal enabledelayedexpansion
+
+:: === DADOS EMBUTIDOS ===
+set "OLD_EXE={old_exe}"
+set "NEW_EXE={new_exe}"
+
+:: === Encerrando processo atual ===
+echo Encerrando processo atual...
+for %%I in ("%OLD_EXE%") do set "EXE_NAME=%%~nxI"
+taskkill /IM "!EXE_NAME!" /F >nul 2>&1
+
+:: === VALIDAÇÃO DOS CAMINHOS ===
+if not exist "%OLD_EXE%" (
+    echo ERRO: Executável original não encontrado
+    echo [DEBUG] Caminho verificado: %OLD_EXE%
+    pause
+    exit /b 1
+)
+
+if not exist "%NEW_EXE%" (
+    echo ERRO: Novo executável não encontrado
+    echo [DEBUG] Caminho verificado: %NEW_EXE%
+    pause
+    exit /b 1
+)
+
+:: === LÓGICA DE ATUALIZAÇÃO ===
+set "MAX_TENTATIVAS=10"
+:loop_substituicao
+del /F /Q "%OLD_EXE%" >nul 2>&1
+
+if exist "%OLD_EXE%" (
+    echo Aguardando liberação do arquivo...
+    timeout /t 1 /nobreak >nul
+    set /a MAX_TENTATIVAS-=1
+    if !MAX_TENTATIVAS! GTR 0 goto loop_substituicao
+    
+    echo Falha crítica: Não foi possível substituir o arquivo
+    pause
+    exit /b 1
+)
+
+move /Y "%NEW_EXE%" "%OLD_EXE%" >nul || (
+    echo ERRO: Falha ao mover novo executável
+    pause
+    exit /b 1
+)
+
+echo Reiniciando aplicação...
+start "" "%OLD_EXE%"
+exit /b 0
+"""
+
+    def write_and_validate_bat(self, content, old_exe, new_exe):
+        """Escreve o arquivo BAT e verifica a integridade"""
+        old_exe = os.path.normpath(os.path.abspath(old_exe))
+        new_exe = os.path.normpath(os.path.abspath(new_exe))
+        bat_path = os.path.join(tempfile.gettempdir(), "update_script.bat")
+    
+        # Escrever com codificação UTF-8 com BOM
+        with open(bat_path, "w", encoding="utf-8-sig") as f:
+            f.write(content)
+    
+        # Verificação crítica
+        with open(bat_path, "r", encoding="utf-8-sig") as f:
+            content_read = f.read()
+            if old_exe not in content_read or new_exe not in content_read:
+                raise ValueError("Falha na geração do script de atualização")
+        
+        return bat_path
 
 class ConfigManager:
     """Gerencia o carregamento e salvamento das configurações do aplicativo."""
@@ -113,7 +241,10 @@ class NotepadManager:
 class SupportApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Versão Suporte 2.3")
+        self.root.title("Versão Suporte 2.4")
+        self.current_version = "2.4"
+        self.updater = Updater(self.current_version)
+        self.check_updates()
 
         # Inicializa os gerenciadores
         self.config_manager = ConfigManager()
@@ -137,6 +268,12 @@ class SupportApp:
         self.undo_stack = []
         self.redo_stack = []
 
+    def check_updates(self):
+        version_info = self.updater.check_for_updates()
+        if version_info:
+            if messagebox.askyesno("Atualização Disponível", f"Uma nova versão ({version_info['version']}) está disponível. Deseja atualizar agora?"):
+                self.updater.download_and_install(version_info["download_url"])
+
     def load_sound(self):
         try:
             self.click_sound = pygame.mixer.Sound("click.wav")
@@ -158,12 +295,12 @@ class SupportApp:
             if event.widget == self.root:
                 current_geometry = self.root.wm_geometry()
         
-            if self.config["notepad_expanded"]:
-                self.config["window_size_notepad"] = current_geometry
-            else:
-                self.config["window_size_normal"] = current_geometry
+                if self.config["notepad_expanded"]:
+                    self.config["window_size_notepad"] = current_geometry
+                else:
+                    self.config["window_size_normal"] = current_geometry
         
-            self.config_manager.save_config()
+                self.config_manager.save_config()
             
     def load_bg_image(self):
         try:
@@ -294,10 +431,10 @@ class SupportApp:
     def show_about(self):
         about_window = tk.Toplevel(self.root)
         about_window.title("Sobre")
-        about_window.geometry("400x350")  # Aumentando a largura e altura da janela
+        about_window.geometry("400x300")  # Aumenta a largura e altura da janela
 
-        # Adicionando informações sobre a versão
-        tk.Label(about_window, text="Versão Suporte 2.3\n").pack(padx=20, pady=(20, 5))
+        # Adiciona informações sobre a versão
+        tk.Label(about_window, text="Versão Suporte 2.4\n").pack(padx=20, pady=(20, 5))
 
         # Nome do desenvolvedor
         nome_label = tk.Label(about_window, text="Paulo Gama", fg="blue", cursor="hand2")
@@ -309,10 +446,13 @@ class SupportApp:
         email_label.pack(padx=20, pady=(5, 10))
         email_label.bind("<1>", lambda event: self.copy_to_clipboard("DreamerJPMG@gmail.com"))
 
-        # Adicionando informações sobre as tecnologias utilizadas
+        # Adiciona informações sobre as tecnologias utilizadas
         tk.Label(about_window, text="Tecnologias utilizadas:").pack(padx=20, pady=(5, 5))
-        tk.Label(about_window, text="- Python\n- Tkinter\n- Pygame\n- JSON").pack(padx=20, pady=(5, 10))
 
+        # Texto com quebra automática
+        tecnologias = "Python, Tkinter, Pygame, JSON, Requests, Subprocess, Tempfile, Random, Time, OS, Sys, TTK (Themed Tkinter), ScrolledText, Messagebox, Filedialog, Simpledialog."
+        tk.Label(about_window, text=tecnologias, wraplength=350, justify="left").pack(padx=20, pady=(5, 10))
+        
         # Informações sobre o desenvolvimento
         tk.Label(about_window, text="Desenvolvido como um projeto pessoal.").pack(padx=20, pady=(5, 5))
         
@@ -333,7 +473,7 @@ class SupportApp:
         self.config["dark_mode"] = not self.config["dark_mode"]
         self.view_menu.entryconfig(0, label="Desativar Modo Noturno" if self.config["dark_mode"] else "Ativar Modo Noturno")
     
-        # Salvar o conteúdo atual do bloco de notas antes de recarregar a interface
+        # Salva o conteúdo atual do bloco de notas antes de recarregar a interface
         notepad_content = self.notepad_text.get("1.0", tk.END)
         notepad_tags = []
         for tag in self.notepad_text.tag_names():
@@ -372,7 +512,7 @@ class SupportApp:
         # Recarregar a interface
         self.refresh_gui()
     
-        # Restaurar o conteúdo do bloco de notas após a recarga
+        # Restaura o conteúdo do bloco de notas após a recarga
         self.notepad_text.insert(tk.END, notepad_content)
         for tag in notepad_tags:
             self.notepad_text.tag_add(tag["tag"], tag["start"], tag["end"])
@@ -385,7 +525,7 @@ class SupportApp:
 
     def toggle_notepad(self):
         """Alterna a visibilidade do bloco de notas e ajusta a janela."""
-        # 1. Salvar geometria atual ANTES de mudar o estado
+        # 1. Salva geometria atual ANTES de mudar o estado
         current_geometry = self.root.wm_geometry()
     
         if self.config["notepad_expanded"]:
@@ -396,7 +536,7 @@ class SupportApp:
         # 2. Alternar o estado
         self.config["notepad_expanded"] = not self.config["notepad_expanded"]
     
-        # 3. Aplicar nova geometria baseada no NOVO estado
+        # 3. Aplicar nova geometria baseada no novo estado
         if self.config["notepad_expanded"]:
             nova_geometria = self.config["window_size_notepad"]
             self.notepad_frame.pack(fill="both", expand=True)
@@ -404,26 +544,26 @@ class SupportApp:
             nova_geometria = self.config["window_size_normal"]
             self.notepad_frame.pack_forget()
 
-        # 4. Forçar redimensionamento imediato
+        # 4. Força redimensionamento imediato
         self.root.geometry(nova_geometria)
         self.root.update_idletasks()
     
-        # 5. Atualizar menu e salvar configuração
+        # 5. Atualiza menu e salvar configuração
         self.view_menu.entryconfig(4, label="Ocultar Bloco de Notas" if self.config["notepad_expanded"] else "Exibir Bloco de Notas")
         self.config_manager.save_config()
 
     def adjust_window_geometry(self):
-        # Obter a geometria atual da janela
+        # Obtem a geometria atual da janela
         current_geometry = self.root.geometry()
         width, height, x, y = map(int, current_geometry.replace('x', '+').split('+'))
     
-        # Definir a nova altura da janela com base no estado do bloco de notas
+        # Define a nova altura da janela com base no estado do bloco de notas
         if self.config["notepad_expanded"]:
-            new_height = height + 200  # Aumentar a altura para acomodar o bloco de notas
+            new_height = height + 200  # Aumenta a altura para acomodar o bloco de notas
         else:
-            new_height = height - 200  # Reduzir a altura para recolher o bloco de notas
+            new_height = height - 200  # Reduz a altura para recolher o bloco de notas
     
-        # Aplicar a nova geometria
+        # Aplica nova geometria
         self.root.geometry(f"{width}x{new_height}+{x}+{y}")
 
     def change_bg_image(self):
