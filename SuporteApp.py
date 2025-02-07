@@ -1,7 +1,7 @@
 import os
 import sys
 import tkinter as tk
-from tkinter import simpledialog, scrolledtext, filedialog, ttk, messagebox
+from tkinter import simpledialog, scrolledtext, filedialog, ttk, messagebox, colorchooser
 import json
 import pygame
 import random
@@ -12,14 +12,8 @@ import time
 import shutil
 
 # Constantes para cores e caminhos de arquivo
-DEFAULT_BG_COLOR = "#2C3E50"
-DEFAULT_BTN_FG_COLOR = "#ECF0F1"
-DEFAULT_BTN_BG_COLOR = "#E74C3C"
-DEFAULT_EDIT_BTN_BG_COLOR = "#3498DB"
-DARK_BG_COLOR = "#1E1E1E"
-DARK_BTN_FG_COLOR = "#FFFFFF"
-DARK_BTN_BG_COLOR = "#333333"
-DARK_EDIT_BTN_BG_COLOR = "#555555"
+DEFAULT_BG_COLOR = "#FFFFFF"          # Cor de fundo padrão
+DARK_BG_COLOR = "#000000"              # Cor de fundo no modo escuro
 DEFAULT_WINDOW_SIZE = "800x600+100+100"
 DEFAULT_BG_IMAGE_PATH = "background.png"
 CONFIG_FILE = "config.txt"
@@ -194,18 +188,12 @@ class ConfigManager:
             "sound_enabled": True,
             "dark_mode": False,
             "bg_color": DEFAULT_BG_COLOR,
-            "btn_fg_color": DEFAULT_BTN_FG_COLOR,
-            "btn_bg_color": DEFAULT_BTN_BG_COLOR,
-            "edit_btn_bg_color": DEFAULT_EDIT_BTN_BG_COLOR,
             "show_edit_buttons": True,
             "window_size_normal": DEFAULT_WINDOW_SIZE,
-            "window_size_notepad": "800x800+100+100",  # Tamanho padrão com bloco de notas
+            "window_size_notepad": "800x800+100+100",
             "notepad_expanded": True,
             "last_bg_image_path": DEFAULT_BG_IMAGE_PATH,
-            "last_bg_color": DEFAULT_BG_COLOR,
-            "last_btn_fg_color": DEFAULT_BTN_FG_COLOR,
-            "last_btn_bg_color": DEFAULT_BTN_BG_COLOR,
-            "last_edit_btn_bg_color": DEFAULT_EDIT_BTN_BG_COLOR
+            "last_bg_color": DEFAULT_BG_COLOR
         }
         self.config = self.load_config()
 
@@ -278,7 +266,16 @@ class SupportApp:
     def __init__(self, root):
         self.root = root
         self.root.title("SuporteApp")
-        self.current_version = "2.6"
+
+        try:
+            if getattr(sys, 'frozen', False):  # Verifica se é executável compilado
+                # Caminho para o ícone nos recursos temporários do executável
+                icon_path = os.path.join(sys._MEIPASS, "ico.ico")
+                self.root.iconbitmap(icon_path)
+        except Exception as e:
+            print(f"Icone não carregado: {e}")
+        
+        self.current_version = "2.7"
         self.updater = Updater(self.current_version)
         self.check_updates()
 
@@ -452,7 +449,7 @@ class SupportApp:
             label="Desativar Modo Noturno" if self.config["dark_mode"] else "Ativar Modo Noturno",
             command=self.toggle_dark_mode
         )
-        self.view_menu.add_command(label="Editar Cores", command=self.edit_colors)
+        self.view_menu.add_command(label="Editar Cor de fundo", command=self.edit_colors)
         self.view_menu.add_command(
             label="Ocultar Botões de Edição" if self.config["show_edit_buttons"] else "Exibir Botões de Edição",
             command=self.toggle_edit_buttons
@@ -479,7 +476,7 @@ class SupportApp:
         about_window.geometry("400x300")  # Aumenta a largura e altura da janela
 
         # Adiciona informações sobre a versão
-        tk.Label(about_window, text="Versão Suporte 2.6\n").pack(padx=20, pady=(20, 5))
+        tk.Label(about_window, text="Versão Suporte 2.7\n").pack(padx=20, pady=(20, 5))
 
         # Nome do desenvolvedor
         nome_label = tk.Label(about_window, text="Paulo Gama", fg="blue", cursor="hand2")
@@ -501,9 +498,6 @@ class SupportApp:
         # Informações sobre o desenvolvimento
         tk.Label(about_window, text="Desenvolvido como um projeto pessoal.").pack(padx=20, pady=(5, 5))
         
-        # Botão de fechar
-        ttk.Button(about_window, text="Fechar", command=about_window.destroy).pack(pady=10)
-
     def start_snake_game(self, about_window):
         about_window.destroy()
         snake_game = tk.Toplevel(self.root)
@@ -536,25 +530,13 @@ class SupportApp:
         if self.config["dark_mode"]:
             self.config["last_bg_image_path"] = self.config["bg_image_path"]
             self.config["last_bg_color"] = self.config["bg_color"]
-            self.config["last_btn_fg_color"] = self.config["btn_fg_color"]
-            self.config["last_btn_bg_color"] = self.config["btn_bg_color"]
-            self.config["last_edit_btn_bg_color"] = self.config["edit_btn_bg_color"]
-        
-            self.config["bg_image_path"] = "ModoNoturno.png"
-            self.config["bg_color"] = DARK_BG_COLOR
-            self.config["btn_fg_color"] = DARK_BTN_FG_COLOR
-            self.config["btn_bg_color"] = DARK_BTN_BG_COLOR
-            self.config["edit_btn_bg_color"] = DARK_EDIT_BTN_BG_COLOR
+            self.config["bg_image_path"] = "ModoNoturno.png"  # Imagem de fundo para o modo escuro
+            self.config["bg_color"] = DARK_BG_COLOR  # Usa a constante DARK_BG_COLOR
         else:
             self.config["bg_image_path"] = self.config.get("last_bg_image_path", DEFAULT_BG_IMAGE_PATH)
             self.config["bg_color"] = self.config.get("last_bg_color", DEFAULT_BG_COLOR)
-            self.config["btn_fg_color"] = self.config.get("last_btn_fg_color", DEFAULT_BTN_FG_COLOR)
-            self.config["btn_bg_color"] = self.config.get("last_btn_bg_color", DEFAULT_BTN_BG_COLOR)
-            self.config["edit_btn_bg_color"] = self.config.get("last_edit_btn_bg_color", DEFAULT_EDIT_BTN_BG_COLOR)
     
         self.config_manager.save_config()
-    
-        # Recarrega a interface
         self.refresh_gui()
     
         # Restaura o conteúdo do bloco de notas após a recarga
@@ -581,7 +563,7 @@ class SupportApp:
         # 2. Alterna o estado
         self.config["notepad_expanded"] = not self.config["notepad_expanded"]
     
-        # 3. Aplica nova geometria baseada no NOVO estado
+        # 3. Aplica nova geometria baseada no novo estado
         if self.config["notepad_expanded"]:
             nova_geometria = self.config["window_size_notepad"]
             self.notepad_frame.pack(fill="both", expand=True)
@@ -622,22 +604,65 @@ class SupportApp:
         edit_window = tk.Toplevel(self.root)
         edit_window.title("Editar Cores")
 
-        tk.Label(edit_window, text="Cor do Fundo:").pack()
-        bg_color_entry = tk.Entry(edit_window)
+        # Frame principal para organização
+        main_frame = ttk.Frame(edit_window)
+        main_frame.pack(padx=20, pady=20)
+
+        # Frame para a cor de fundo
+        bg_frame = ttk.LabelFrame(main_frame, text="Cor de Fundo")
+        bg_frame.grid(row=0, column=0, padx=10, pady=10, sticky="w")
+
+        # Label explicativa
+        ttk.Label(bg_frame, text="Digite o código hexadecimal ou use o seletor:").grid(row=0, column=0, columnspan=3, pady=5)
+
+        # Entrada para o código hexadecimal
+        bg_color_entry = ttk.Entry(bg_frame, width=10)
+        bg_color_entry.grid(row=1, column=0, padx=5, pady=5)
         bg_color_entry.insert(0, self.config["bg_color"])
-        bg_color_entry.pack()
+
+        # Botão de seleção de cor
+        def choose_color():
+            # Abre o seletor de cores e pega a cor selecionada
+            color = colorchooser.askcolor(title="Selecione uma cor", parent=edit_window)[1]
+            if color:
+                # Atualiza o campo de entrada com a cor selecionada
+                bg_color_entry.delete(0, tk.END)
+                bg_color_entry.insert(0, color)
+                update_preview()  # Atualiza o preview após selecionar a cor
+
+        ttk.Button(bg_frame, text="🎨 Seletor", command=choose_color).grid(row=1, column=1, padx=5, pady=5)
+
+        # Botão de visualização
+        preview_canvas = tk.Canvas(bg_frame, width=30, height=20, bg=self.config["bg_color"])
+        preview_canvas.grid(row=1, column=2, padx=5, pady=5)
+
+        def update_preview():
+            color = bg_color_entry.get()
+            if self.is_valid_color(color):
+                preview_canvas.config(bg=color)
+
+        bg_color_entry.bind("<KeyRelease>", lambda e: update_preview())
+
+        # Botões de ação
+        button_frame = ttk.Frame(main_frame)
+        button_frame.grid(row=1, column=0, pady=10)
 
         def save_colors():
             new_bg_color = bg_color_entry.get()
+            if new_bg_color and not new_bg_color.startswith("#"):
+                new_bg_color = "#" + new_bg_color
+
             if self.is_valid_color(new_bg_color):
                 self.config["bg_color"] = new_bg_color
                 self.config_manager.save_config()
                 self.refresh_gui()
                 edit_window.destroy()
             else:
-                tk.messagebox.showerror("Erro", "Cor inválida. Por favor, insira uma cor válida.")
+                tk.messagebox.showerror("Erro", "Cor inválida. Por favor, insira um código hexadecimal válido.")
 
-        ttk.Button(edit_window, text="Salvar", command=save_colors).pack(pady=5)
+        ttk.Button(button_frame, text="Salvar", command=save_colors).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Cancelar", command=edit_window.destroy).pack(side=tk.LEFT, padx=5)
+
 
     def is_valid_color(self, color):
         try:
