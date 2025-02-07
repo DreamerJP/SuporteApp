@@ -112,18 +112,18 @@ class NotepadManager:
 class SupportApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Versão Suporte 2.1")
+        self.root.title("Versão Suporte 2.2")
 
-        # Primeiro inicializa os gerenciadores
+        # Inicializa os gerenciadores
         self.config_manager = ConfigManager()
         self.text_manager = TextManager()
         self.notepad_manager = NotepadManager()
 
-        # DEPOIS carrega as configurações
-        self.config = self.config_manager.config  # <--- Aqui está a correção
+        # Carrega as configurações
+        self.config = self.config_manager.config
         self.texts = self.text_manager.texts
 
-        # Agora sim define a geometria
+        # Define a geometria
         initial_size = self.config["window_size_notepad" if self.config["notepad_expanded"] else "window_size_normal"]
         self.root.geometry(initial_size)
 
@@ -131,6 +131,10 @@ class SupportApp:
         pygame.mixer.init()
         self.click_sound = None
         self.load_sound()
+
+        # Inicializa pilhas de undo e redo
+        self.undo_stack = []
+        self.redo_stack = []
 
     def load_sound(self):
         try:
@@ -153,7 +157,6 @@ class SupportApp:
             if event.widget == self.root:
                 current_geometry = self.root.wm_geometry()
         
-            # Salva no estado correto
             if self.config["notepad_expanded"]:
                 self.config["window_size_notepad"] = current_geometry
             else:
@@ -290,7 +293,7 @@ class SupportApp:
     def show_about(self):
         about_window = tk.Toplevel(self.root)
         about_window.title("Sobre")
-        tk.Label(about_window, text="Versão Suporte 2.1\nDesenvolvido por Paulo Gama\nDreamerJPMG@gmail.com").pack(padx=20, pady=20)
+        tk.Label(about_window, text="Versão Suporte 2.2\nDesenvolvido por Paulo Gama\nDreamerJPMG@gmail.com").pack(padx=20, pady=20)
         ttk.Button(about_window, text="Fechar", command=about_window.destroy).pack(pady=10)
 
     def toggle_sound(self):
@@ -446,6 +449,97 @@ class SupportApp:
 
         if not self.config["notepad_expanded"]:
             self.notepad_frame.pack_forget()
+
+        # Vincula eventos de teclado para undo/redo
+        self.notepad_text.bind("<Control-z>", self.undo)
+        self.notepad_text.bind("<Control-y>", self.redo)
+        self.notepad_text.bind("<Control-Z>", self.undo)  # Para sistemas que usam Shift
+        self.notepad_text.bind("<Control-Y>", self.redo)  # Para sistemas que usam Shift
+
+        # Salva o estado após uma pausa na digitação
+        self.save_timer = None
+        self.notepad_text.bind("<KeyRelease>", self._schedule_save_state)
+
+    def _schedule_save_state(self, event=None):
+        """Agenda o salvamento do estado após uma pausa na digitação."""
+        if self.save_timer:
+            self.root.after_cancel(self.save_timer)
+        self.save_timer = self.root.after(1000, self.save_state)  # Salva após 1 segundo de inatividade
+
+    def save_state(self):
+        """Salva o estado atual do bloco de notas no histórico."""
+        if not self.notepad_text:
+            return  # Evita erros se o bloco de notas não estiver inicializado
+
+        # Captura o texto e as tags
+        text = self.notepad_text.get("1.0", tk.END)
+        tags = self._capture_tags()
+
+        # Adiciona o estado à pilha de undo
+        if self.undo_stack and self.undo_stack[-1] == (text, tags):
+            return  # Evita salvar estados duplicados
+        self.undo_stack.append((text, tags))
+        
+        # Limpa a pilha de redo (não faz sentido refazer após uma nova ação)
+        self.redo_stack.clear()
+
+    def _capture_tags(self):
+        """Captura todas as tags aplicadas no texto."""
+        tags = []
+        for tag in self.notepad_text.tag_names():
+            if tag != "sel":
+                ranges = self.notepad_text.tag_ranges(tag)
+                for i in range(0, len(ranges), 2):
+                    start = ranges[i]
+                    end = ranges[i + 1]
+                    tags.append({
+                        "tag": tag,
+                        "start": self.notepad_text.index(start),
+                        "end": self.notepad_text.index(end)
+                    })
+        return tags
+
+    def undo(self, event=None):
+        """Desfaz a última ação."""
+        if not self.undo_stack:
+            return  # Nada para desfazer
+
+        # Salva o estado atual na pilha de redo
+        current_text = self.notepad_text.get("1.0", tk.END)
+        current_tags = self._capture_tags()
+        self.redo_stack.append((current_text, current_tags))
+        
+        # Restaura o estado anterior
+        text, tags = self.undo_stack.pop()
+        self._restore_state(text, tags)
+
+    def redo(self, event=None):
+        """Refaz a última ação desfeita."""
+        if not self.redo_stack:
+            return  # Nada para refazer
+
+        # Salva o estado atual na pilha de undo
+        current_text = self.notepad_text.get("1.0", tk.END)
+        current_tags = self._capture_tags()
+        self.undo_stack.append((current_text, current_tags))
+        
+        # Restaura o estado futuro
+        text, tags = self.redo_stack.pop()
+        self._restore_state(text, tags)
+
+    def _restore_state(self, text, tags):
+        """Restaura o texto e as tags no bloco de notas."""
+        self.notepad_text.delete("1.0", tk.END)
+        self.notepad_text.insert(tk.END, text)
+        
+        # Remove todas as tags existentes
+        for tag in self.notepad_text.tag_names():
+            if tag != "sel":
+                self.notepad_text.tag_remove(tag, "1.0", tk.END)
+        
+        # Aplica as tags
+        for tag in tags:
+            self.notepad_text.tag_add(tag["tag"], tag["start"], tag["end"])
 
     def add_separator(self):
         self.notepad_text.insert(tk.END, "\n______________________\n")
