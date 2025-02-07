@@ -137,7 +137,7 @@ exit /b 0
         new_exe = os.path.normpath(os.path.abspath(new_exe))
         bat_path = os.path.join(tempfile.gettempdir(), "update_script.bat")
     
-        # Escrever com codificação UTF-8 com BOM
+        # Escreve com codificação UTF-8 com BOM
         with open(bat_path, "w", encoding="utf-8-sig") as f:
             f.write(content)
     
@@ -241,8 +241,8 @@ class NotepadManager:
 class SupportApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Versão Suporte 2.4")
-        self.current_version = "2.4"
+        self.root.title("Versão Suporte 2.5")
+        self.current_version = "2.5"
         self.updater = Updater(self.current_version)
         self.check_updates()
 
@@ -380,21 +380,30 @@ class SupportApp:
 
     def open_edit_window(self, idx):
         edit_window = tk.Toplevel(self.root)
-        edit_window.title("Editar Texto")
+        edit_window.title("Editar Texto e Nome do Botão")
 
+        # Campo para editar o nome do botão
+        tk.Label(edit_window, text="Nome do Botão:").pack(padx=10, pady=(10, 0))
+        name_entry = tk.Entry(edit_window, width=50)
+        name_entry.pack(padx=10, pady=(0, 10))
+        name_entry.insert(tk.END, self.texts[idx][1])  # Preenche com o nome atual do botão
+
+        # Campo para editar o texto do botão
+        tk.Label(edit_window, text="Texto do Botão:").pack(padx=10, pady=(10, 0))
         text_box = scrolledtext.ScrolledText(edit_window, wrap=tk.WORD, width=50, height=15)
-        text_box.pack(padx=10, pady=10)
-        text_box.insert(tk.END, self.texts[idx][0])
+        text_box.pack(padx=10, pady=(0, 10))
+        text_box.insert(tk.END, self.texts[idx][0])  # Preenche com o texto atual do botão
 
         def save_text():
             new_text = text_box.get("1.0", tk.END).strip()
-            if new_text:
-                self.texts[idx] = (new_text, self.texts[idx][1])
+            new_name = name_entry.get()
+            if new_name and new_text:
+                self.texts[idx] = (new_text, new_name)  # Atualiza tanto o texto quanto o nome
                 self.text_manager.save_texts()
                 self.refresh_gui()
                 edit_window.destroy()
 
-        ttk.Button(edit_window, text="Salvar", command=save_text).pack(pady=5)
+        ttk.Button(edit_window, text="Salvar", command=save_text).pack(pady=10)
 
     def create_menu(self):
         menu_bar = tk.Menu(self.root)
@@ -434,7 +443,7 @@ class SupportApp:
         about_window.geometry("400x300")  # Aumenta a largura e altura da janela
 
         # Adiciona informações sobre a versão
-        tk.Label(about_window, text="Versão Suporte 2.4\n").pack(padx=20, pady=(20, 5))
+        tk.Label(about_window, text="Versão Suporte 2.5\n").pack(padx=20, pady=(20, 5))
 
         # Nome do desenvolvedor
         nome_label = tk.Label(about_window, text="Paulo Gama", fg="blue", cursor="hand2")
@@ -473,7 +482,7 @@ class SupportApp:
         self.config["dark_mode"] = not self.config["dark_mode"]
         self.view_menu.entryconfig(0, label="Desativar Modo Noturno" if self.config["dark_mode"] else "Ativar Modo Noturno")
     
-        # Salva o conteúdo atual do bloco de notas antes de recarregar a interface
+        # Salvar o conteúdo atual do bloco de notas antes de recarregar a interface
         notepad_content = self.notepad_text.get("1.0", tk.END)
         notepad_tags = []
         for tag in self.notepad_text.tag_names():
@@ -509,7 +518,7 @@ class SupportApp:
     
         self.config_manager.save_config()
     
-        # Recarregar a interface
+        # Recarrega a interface
         self.refresh_gui()
     
         # Restaura o conteúdo do bloco de notas após a recarga
@@ -533,10 +542,10 @@ class SupportApp:
         else:
             self.config["window_size_normal"] = current_geometry
 
-        # 2. Alternar o estado
+        # 2. Alterna o estado
         self.config["notepad_expanded"] = not self.config["notepad_expanded"]
     
-        # 3. Aplicar nova geometria baseada no novo estado
+        # 3. Aplica nova geometria baseada no NOVO estado
         if self.config["notepad_expanded"]:
             nova_geometria = self.config["window_size_notepad"]
             self.notepad_frame.pack(fill="both", expand=True)
@@ -553,7 +562,7 @@ class SupportApp:
         self.config_manager.save_config()
 
     def adjust_window_geometry(self):
-        # Obtem a geometria atual da janela
+        # Obten a geometria atual da janela
         current_geometry = self.root.geometry()
         width, height, x, y = map(int, current_geometry.replace('x', '+').split('+'))
     
@@ -563,7 +572,7 @@ class SupportApp:
         else:
             new_height = height - 200  # Reduz a altura para recolher o bloco de notas
     
-        # Aplica nova geometria
+        # Aplica a nova geometria
         self.root.geometry(f"{width}x{new_height}+{x}+{y}")
 
     def change_bg_image(self):
