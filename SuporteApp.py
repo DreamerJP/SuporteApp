@@ -9,7 +9,7 @@ import winsound
 class SupportApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Versão Suporte técnico")
+        self.root.title("Versão Suporte 1.5")
 
         # Carregar configurações
         self.load_config()
@@ -121,17 +121,30 @@ class SupportApp:
             return "background.png "  # Retorna um valor padrão caso o usuário cancele a sele ç ã o
 
     def create_widgets(self):
-        self.canvas = tk.Canvas(
-            self.root, width=self.bg_image.width(), height=self.bg_image.height())
+        # Criar o Canvas
+        self.canvas = tk.Canvas(self.root, width=self.bg_image.width(), height=self.bg_image.height())
         self.canvas.pack(fill="both", expand=True)
         self.canvas.create_image(0, 0, image=self.bg_image, anchor="nw")
 
-        button_frame = tk.Frame(self.canvas, bg=self.bg_color)
-        self.canvas.create_window(10, 10, anchor="nw", window=button_frame)
+        # Frame para a Scrollbar e o Canvas
+        frame = tk.Frame(self.canvas)
+        self.canvas.create_window(10, 10, anchor="nw", window=frame)
+
+        # Scrollbar
+        self.scrollbar = tk.Scrollbar(frame, orient="vertical", command=self.canvas.yview)
+        self.scrollbar.pack(side="right", fill="y")
+
+        # Frame para os botões
+        button_frame = tk.Frame(frame, bg=self.bg_color)
+        button_frame.pack(side="left", fill="both", expand=True)
+
+        # Configurar o Canvas para usar a Scrollbar
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
 
         button_frame.rowconfigure(0, weight=1)
         button_frame.columnconfigure(0, weight=1)
 
+        # Adicionar os botões
         column = 0
         row = 0
         for idx, (text, resumo) in enumerate(self.texts):
@@ -142,7 +155,7 @@ class SupportApp:
             edit_button = tk.Button(button_frame, text="Editar", command=lambda idx=idx: self.open_edit_window(
                 idx), bg=self.edit_btn_bg_color, fg=self.btn_fg_color, relief="flat")
             if self.show_edit_buttons:
-                edit_button.grid(row=row+1, column=column,
+                edit_button.grid(row=row + 1, column=column,
                                  padx=5, pady=5, sticky="nsew")
             else:
                 edit_button.grid_forget()
@@ -151,6 +164,10 @@ class SupportApp:
             if row > 16:  # Ajuste esse valor para controlar a quantidade de linhas
                 row = 0
                 column += 1
+
+        # Atualizar a região do Canvas para a rolagem
+        button_frame.update_idletasks()  # Atualiza o layout do button_frame
+        self.canvas.config(scrollregion=self.canvas.bbox("all"))  # Define a região de rolagem
 
     def create_menu(self):
         menu_bar = tk.Menu(self.root)
