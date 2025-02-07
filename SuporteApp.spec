@@ -35,5 +35,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['C:\\Users\\Sweet\\OneDrive\\Área de Trabalho\\BETAS\\1.4 beta - Com bloco de notas\\ico.ico'],
+    icon=['C:\\dist\\Versão Suporte - Com bloco de notas 1.5\\Script\\ico.ico'],
 )
