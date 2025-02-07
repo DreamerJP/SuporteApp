@@ -9,6 +9,7 @@ import subprocess
 import tempfile
 import requests
 import time
+import shutil
 
 # Constantes para cores e caminhos de arquivo
 DEFAULT_BG_COLOR = "#2C3E50"
@@ -24,6 +25,41 @@ DEFAULT_BG_IMAGE_PATH = "background.png"
 CONFIG_FILE = "config.txt"
 TEXTS_FILE = "texts.json"
 NOTEPAD_FILE = "notepad.json"
+
+def handle_rmtree_error(func, path, exc_info):
+    """Manipulador de erros para shutil.rmtree."""
+    import stat
+    if not os.access(path, os.W_OK):
+        os.chmod(path, stat.S_IWUSR)
+        func(path)
+    else:
+        raise
+
+def cleanup_old_temp_dirs():
+    """
+    Limpa diretórios temporários antigos (_MEI*) no diretório do executável.
+    Executa automaticamente no início do programa.
+    """
+    try:
+        if not getattr(sys, 'frozen', False):
+            return
+
+        exe_dir = os.path.dirname(sys.executable)
+        current_temp_dir = getattr(sys, '_MEIPASS', None)
+
+        for entry in os.listdir(exe_dir):
+            entry_path = os.path.join(exe_dir, entry)
+            
+            if os.path.isdir(entry_path) and entry.startswith('_MEI') and entry_path != current_temp_dir:
+                print(f"[CLEANUP] Tentando excluir: {entry_path}")
+                try:
+                    shutil.rmtree(entry_path, ignore_errors=True)
+                    print(f"[CLEANUP] Diretório excluído: {entry_path}")
+                except Exception as e:
+                    print(f"[CLEANUP] Erro ao excluir {entry_path}: {str(e)}")
+
+    except Exception as main_error:
+        print(f"[CLEANUP] Erro crítico durante a limpeza: {str(main_error)}")
 
 class Updater:
     def __init__(self, current_version):
@@ -241,8 +277,8 @@ class NotepadManager:
 class SupportApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Versão Suporte 2.5")
-        self.current_version = "2.5"
+        self.root.title("SuporteApp")
+        self.current_version = "2.6"
         self.updater = Updater(self.current_version)
         self.check_updates()
 
@@ -443,7 +479,7 @@ class SupportApp:
         about_window.geometry("400x300")  # Aumenta a largura e altura da janela
 
         # Adiciona informações sobre a versão
-        tk.Label(about_window, text="Versão Suporte 2.5\n").pack(padx=20, pady=(20, 5))
+        tk.Label(about_window, text="Versão Suporte 2.6\n").pack(padx=20, pady=(20, 5))
 
         # Nome do desenvolvedor
         nome_label = tk.Label(about_window, text="Paulo Gama", fg="blue", cursor="hand2")
@@ -459,7 +495,7 @@ class SupportApp:
         tk.Label(about_window, text="Tecnologias utilizadas:").pack(padx=20, pady=(5, 5))
 
         # Texto com quebra automática
-        tecnologias = "Python, Tkinter, Pygame, JSON, Requests, Subprocess, Tempfile, Random, Time, OS, Sys, TTK (Themed Tkinter), ScrolledText, Messagebox, Filedialog, Simpledialog."
+        tecnologias = "Python, Tkinter, Pygame, JSON, Requests, Subprocess, Tempfile, Random, Time, OS, Sys, TTK (Themed Tkinter), ScrolledText, Messagebox, Filedialog, Simpledialog, shutil."
         tk.Label(about_window, text=tecnologias, wraplength=350, justify="left").pack(padx=20, pady=(5, 10))
         
         # Informações sobre o desenvolvimento
@@ -933,6 +969,7 @@ class SnakeGame:
         self.direction_queue.append("right")
 
 if __name__ == "__main__":
+    cleanup_old_temp_dirs()  # Função de limpeza de pasta temporaria MEI na inicialização
     root = tk.Tk()
     app = SupportApp(root)
     root.mainloop()
