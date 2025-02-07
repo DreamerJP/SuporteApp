@@ -3,7 +3,7 @@ import sys
 import tkinter as tk
 from tkinter import simpledialog, scrolledtext, filedialog, ttk
 import json
-import winsound
+import pygame
 
 # Constantes para cores e caminhos de arquivo
 DEFAULT_BG_COLOR = "#2C3E50"
@@ -18,7 +18,7 @@ DEFAULT_WINDOW_SIZE = "800x600+100+100"
 DEFAULT_BG_IMAGE_PATH = "background.png"
 CONFIG_FILE = "config.txt"
 TEXTS_FILE = "texts.json"
-NOTEPAD_FILE = "notepad.json"  # Alterado para .json para salvar tags
+NOTEPAD_FILE = "notepad.json"
 
 class ConfigManager:
     """Gerencia o carregamento e salvamento das configurações do aplicativo."""
@@ -34,7 +34,12 @@ class ConfigManager:
             "edit_btn_bg_color": DEFAULT_EDIT_BTN_BG_COLOR,
             "show_edit_buttons": True,
             "window_size": DEFAULT_WINDOW_SIZE,
-            "notepad_expanded": True  # Novo estado para o bloco de notas
+            "notepad_expanded": True,
+            "last_bg_image_path": DEFAULT_BG_IMAGE_PATH,
+            "last_bg_color": DEFAULT_BG_COLOR,
+            "last_btn_fg_color": DEFAULT_BTN_FG_COLOR,
+            "last_btn_bg_color": DEFAULT_BTN_BG_COLOR,
+            "last_edit_btn_bg_color": DEFAULT_EDIT_BTN_BG_COLOR
         }
         self.config = self.load_config()
 
@@ -44,7 +49,6 @@ class ConfigManager:
             try:
                 with open(self.config_path, "r") as file:
                     config = json.load(file)
-                    # Garantir que todas as chaves padrão estejam presentes
                     for key in self.default_config:
                         if key not in config:
                             config[key] = self.default_config[key]
@@ -57,7 +61,6 @@ class ConfigManager:
         """Salva as configurações no arquivo."""
         with open(self.config_path, "w") as file:
             json.dump(self.config, file)
-
 
 class TextManager:
     """Gerencia o carregamento e salvamento dos textos."""
@@ -79,7 +82,6 @@ class TextManager:
         """Salva os textos no arquivo."""
         with open(self.texts_path, "w", encoding="utf-8") as file:
             json.dump(self.texts, file, ensure_ascii=False, indent=4)
-
 
 class NotepadManager:
     """Gerencia o bloco de notas."""
@@ -106,53 +108,72 @@ class NotepadManager:
         with open(self.notepad_path, "w", encoding="utf-8") as file:
             json.dump(data, file, ensure_ascii=False, indent=4)
 
-
 class SupportApp:
     """Classe principal do aplicativo."""
     def __init__(self, root):
         self.root = root
-        self.root.title("Versão Suporte 1.5")
+        self.root.title("Versão Suporte 2.0")
 
-        # Gerenciadores
         self.config_manager = ConfigManager()
         self.text_manager = TextManager()
         self.notepad_manager = NotepadManager()
 
-        # Configurações iniciais
+        self.root.geometry(self.config_manager.config["window_size"])
+
         self.config = self.config_manager.config
         self.texts = self.text_manager.texts
 
-        # Interface gráfica
         self.setup_ui()
+        pygame.mixer.init()
+        self.click_sound = None
+        self.load_sound()
+
+    def load_sound(self):
+        try:
+            self.click_sound = pygame.mixer.Sound("click.wav")
+        except Exception as e:
+            print(f"Erro ao carregar som: {e}")
+            self.config["sound_enabled"] = False
+            self.sound_menu.entryconfig(0, label="Erro - Som Desativado")
 
     def setup_ui(self):
-        """Configura a interface gráfica."""
         self.root.configure(bg=self.config["bg_color"])
         self.load_bg_image()
-
         self.create_widgets()
         self.create_menu()
         self.create_notepad_widget()
-
-        # Salvar tamanho e posição da janela
         self.root.bind("<Configure>", self.save_window_size)
 
     def save_window_size(self, event):
-        """Salva o tamanho e a posição da janela."""
-        self.config["window_size"] = self.root.wm_geometry()
-        self.config_manager.save_config()
+        if event.widget == self.root:
+            self.config["window_size"] = self.root.wm_geometry()
+            self.config_manager.save_config()
 
     def load_bg_image(self):
-        """Carrega a imagem de fundo."""
         try:
             self.bg_image = tk.PhotoImage(file=self.config["bg_image_path"])
         except tk.TclError:
+            # Exibe mensagem de erro e permite ao usuário selecionar uma nova imagem
             tk.messagebox.showerror("Erro", "Não foi possível carregar a imagem de fundo.")
-            self.config["bg_image_path"] = DEFAULT_BG_IMAGE_PATH
-            self.bg_image = tk.PhotoImage(file=self.config["bg_image_path"])
+            new_path = self.select_bg_image()
+            self.config["bg_image_path"] = new_path
+            self.config_manager.save_config()
+            try:
+                # Tenta carregar a nova imagem selecionada
+                self.bg_image = tk.PhotoImage(file=self.config["bg_image_path"])
+            except tk.TclError:
+                # Se falhar novamente, usa a imagem padrão e exibe erro
+                tk.messagebox.showerror("Erro", "A nova imagem também não pôde ser carregada. Usando imagem padrão.")
+                self.config["bg_image_path"] = DEFAULT_BG_IMAGE_PATH
+                self.config_manager.save_config()
+                try:
+                    self.bg_image = tk.PhotoImage(file=self.config["bg_image_path"])
+                except tk.TclError:
+                    # Se a imagem padrão também não existir, exibe erro e continua sem imagem
+                    tk.messagebox.showerror("Erro", "Imagem padrão não encontrada. Verifique o arquivo.")
+                    self.bg_image = None
 
     def select_bg_image(self):
-        """Abre uma caixa de diálogo para selecionar uma imagem de fundo."""
         file_path = filedialog.askopenfilename(
             title="Selecione a imagem de fundo",
             filetypes=[("Image files", "*.png;*.jpg;*.jpeg;*.gif")]
@@ -160,7 +181,6 @@ class SupportApp:
         return file_path if file_path else DEFAULT_BG_IMAGE_PATH
 
     def create_widgets(self):
-        """Cria os widgets da interface."""
         self.canvas = tk.Canvas(self.root, width=self.bg_image.width(), height=self.bg_image.height())
         self.canvas.pack(fill="both", expand=True)
         self.canvas.create_image(0, 0, image=self.bg_image, anchor="nw")
@@ -178,7 +198,6 @@ class SupportApp:
         self.create_buttons(button_frame)
 
     def create_buttons(self, button_frame):
-        """Cria os botões para os textos."""
         column, row = 0, 0
         for idx, (text, resumo) in enumerate(self.texts):
             button = ttk.Button(button_frame, text=resumo, command=lambda t=text: self.copy_to_clipboard(t))
@@ -189,7 +208,7 @@ class SupportApp:
                 edit_button.grid(row=row + 1, column=column, padx=5, pady=5, sticky="nsew")
 
             row += 2
-            if row > 16:  # Limite de linhas por coluna
+            if row > 16:
                 row = 0
                 column += 1
 
@@ -197,14 +216,16 @@ class SupportApp:
         self.canvas.config(scrollregion=self.canvas.bbox("all"))
 
     def copy_to_clipboard(self, text):
-        """Copia o texto para a área de transferência."""
         self.root.clipboard_clear()
         self.root.clipboard_append(text)
-        if self.config["sound_enabled"]:
-            winsound.PlaySound("click.wav", winsound.SND_FILENAME | winsound.SND_ASYNC)
+        if self.config["sound_enabled"] and self.click_sound:
+            try:
+                # Toca em um novo canal cada vez para permitir sobreposição
+                pygame.mixer.find_channel(True).play(self.click_sound)
+            except Exception as e:
+                print(f"Erro ao reproduzir som: {e}")
 
     def open_edit_window(self, idx):
-        """Abre uma janela para editar o texto."""
         edit_window = tk.Toplevel(self.root)
         edit_window.title("Editar Texto")
 
@@ -223,11 +244,9 @@ class SupportApp:
         ttk.Button(edit_window, text="Salvar", command=save_text).pack(pady=5)
 
     def create_menu(self):
-        """Cria o menu da aplicação."""
         menu_bar = tk.Menu(self.root)
         self.root.config(menu=menu_bar)
 
-        # Menu Visual
         self.view_menu = tk.Menu(menu_bar, tearoff=0)
         menu_bar.add_cascade(label="Visual", menu=self.view_menu)
         self.view_menu.add_command(label="Alterar Plano de Fundo", command=self.change_bg_image)
@@ -245,7 +264,6 @@ class SupportApp:
             command=self.toggle_notepad
         )
 
-        # Menu Som
         self.sound_menu = tk.Menu(menu_bar, tearoff=0)
         menu_bar.add_cascade(label="Som", menu=self.sound_menu)
         self.sound_menu.add_command(
@@ -253,58 +271,102 @@ class SupportApp:
             command=self.toggle_sound
         )
 
-        # Menu Ajuda
         help_menu = tk.Menu(menu_bar, tearoff=0)
         menu_bar.add_cascade(label="Ajuda", menu=help_menu)
         help_menu.add_command(label="Sobre", command=self.show_about)
 
     def show_about(self):
-        """Exibe uma janela com informações sobre o programa."""
         about_window = tk.Toplevel(self.root)
         about_window.title("Sobre")
-        tk.Label(about_window, text="Versão Suporte 1.5\nDesenvolvido por [Paulo Gama]").pack(padx=20, pady=20)
+        tk.Label(about_window, text="Versão Suporte 2.0\nDesenvolvido por Paulo Gama\nDreamerJPMG@gmail.com").pack(padx=20, pady=20)
         ttk.Button(about_window, text="Fechar", command=about_window.destroy).pack(pady=10)
 
     def toggle_sound(self):
-        """Alterna o estado do som."""
         self.config["sound_enabled"] = not self.config["sound_enabled"]
         self.sound_menu.entryconfig(0, label="Desativar Som de Clique" if self.config["sound_enabled"] else "Ativar Som de Clique")
         self.config_manager.save_config()
 
     def toggle_dark_mode(self):
-        """Alterna o modo noturno."""
         self.config["dark_mode"] = not self.config["dark_mode"]
         self.view_menu.entryconfig(0, label="Desativar Modo Noturno" if self.config["dark_mode"] else "Ativar Modo Noturno")
-        
+    
+        # Salvar o conteúdo atual do bloco de notas antes de recarregar a interface
+        notepad_content = self.notepad_text.get("1.0", tk.END)
+        notepad_tags = []
+        for tag in self.notepad_text.tag_names():
+            if tag != "sel":
+                ranges = self.notepad_text.tag_ranges(tag)
+                for i in range(0, len(ranges), 2):
+                    start = ranges[i]
+                    end = ranges[i + 1]
+                    notepad_tags.append({
+                        "tag": tag,
+                        "start": str(start),
+                        "end": str(end)
+                    })
+    
         if self.config["dark_mode"]:
+            self.config["last_bg_image_path"] = self.config["bg_image_path"]
+            self.config["last_bg_color"] = self.config["bg_color"]
+            self.config["last_btn_fg_color"] = self.config["btn_fg_color"]
+            self.config["last_btn_bg_color"] = self.config["btn_bg_color"]
+            self.config["last_edit_btn_bg_color"] = self.config["edit_btn_bg_color"]
+        
+            self.config["bg_image_path"] = "ModoNoturno.png"
             self.config["bg_color"] = DARK_BG_COLOR
             self.config["btn_fg_color"] = DARK_BTN_FG_COLOR
             self.config["btn_bg_color"] = DARK_BTN_BG_COLOR
             self.config["edit_btn_bg_color"] = DARK_EDIT_BTN_BG_COLOR
         else:
-            self.config["bg_color"] = DEFAULT_BG_COLOR
-            self.config["btn_fg_color"] = DEFAULT_BTN_FG_COLOR
-            self.config["btn_bg_color"] = DEFAULT_BTN_BG_COLOR
-            self.config["edit_btn_bg_color"] = DEFAULT_EDIT_BTN_BG_COLOR
-        
+            self.config["bg_image_path"] = self.config.get("last_bg_image_path", DEFAULT_BG_IMAGE_PATH)
+            self.config["bg_color"] = self.config.get("last_bg_color", DEFAULT_BG_COLOR)
+            self.config["btn_fg_color"] = self.config.get("last_btn_fg_color", DEFAULT_BTN_FG_COLOR)
+            self.config["btn_bg_color"] = self.config.get("last_btn_bg_color", DEFAULT_BTN_BG_COLOR)
+            self.config["edit_btn_bg_color"] = self.config.get("last_edit_btn_bg_color", DEFAULT_EDIT_BTN_BG_COLOR)
+    
         self.config_manager.save_config()
+    
+        # Recarregar a interface
         self.refresh_gui()
+    
+        # Restaurar o conteúdo do bloco de notas após a recarga
+        self.notepad_text.insert(tk.END, notepad_content)
+        for tag in notepad_tags:
+            self.notepad_text.tag_add(tag["tag"], tag["start"], tag["end"])
 
     def toggle_edit_buttons(self):
-        """Alterna a visibilidade dos botões de edição."""
         self.config["show_edit_buttons"] = not self.config["show_edit_buttons"]
         self.view_menu.entryconfig(2, label="Ocultar Botões de Edição" if self.config["show_edit_buttons"] else "Exibir Botões de Edição")
         self.config_manager.save_config()
         self.refresh_gui()
 
     def toggle_notepad(self):
-        """Alterna a visibilidade do bloco de notas."""
         self.config["notepad_expanded"] = not self.config["notepad_expanded"]
         self.view_menu.entryconfig(4, label="Ocultar Bloco de Notas" if self.config["notepad_expanded"] else "Exibir Bloco de Notas")
-        self.refresh_gui()
+    
+        if self.config["notepad_expanded"]:
+            self.notepad_frame.pack(fill="both", expand=True)
+        else:
+            self.notepad_frame.pack_forget()
+    
+        # Ajustar a geometria da janela
+        self.adjust_window_geometry()
+
+    def adjust_window_geometry(self):
+        # Obter a geometria atual da janela
+        current_geometry = self.root.geometry()
+        width, height, x, y = map(int, current_geometry.replace('x', '+').split('+'))
+    
+        # Definir a nova altura da janela com base no estado do bloco de notas
+        if self.config["notepad_expanded"]:
+            new_height = height + 200  # Aumentar a altura para acomodar o bloco de notas
+        else:
+            new_height = height - 200  # Reduzir a altura para recolher o bloco de notas
+    
+        # Aplicar a nova geometria
+        self.root.geometry(f"{width}x{new_height}+{x}+{y}")
 
     def change_bg_image(self):
-        """Altera a imagem de fundo."""
         file_path = filedialog.askopenfilename(filetypes=[("Image files", "*.png;*.jpg;*.jpeg;*.gif")])
         if file_path:
             self.config["bg_image_path"] = file_path
@@ -312,7 +374,6 @@ class SupportApp:
             self.refresh_gui()
 
     def edit_colors(self):
-        """Abre uma janela para editar as cores."""
         edit_window = tk.Toplevel(self.root)
         edit_window.title("Editar Cores")
 
@@ -330,7 +391,6 @@ class SupportApp:
         ttk.Button(edit_window, text="Salvar", command=save_colors).pack(pady=5)
 
     def create_notepad_widget(self):
-        """Cria o widget do bloco de notas."""
         self.notepad_frame = tk.Frame(self.root, bg=self.config["bg_color"])
         self.notepad_frame.pack(fill="both", expand=True)
 
@@ -340,11 +400,11 @@ class SupportApp:
         self.notepad_toolbar = tk.Frame(self.notepad_frame, bg=self.config["bg_color"])
         self.notepad_toolbar.pack(fill="x", side="top")
 
-        ttk.Button(self.notepad_toolbar, text="Negrito", command=lambda: self.notepad_text.tag_add("bold", "sel.first", "sel.last")).pack(side="left")
-        ttk.Button(self.notepad_toolbar, text="Itálico", command=lambda: self.notepad_text.tag_add("italic", "sel.first", "sel.last")).pack(side="left")
-        ttk.Button(self.notepad_toolbar, text="Sublinhado", command=lambda: self.notepad_text.tag_add("underline", "sel.first", "sel.last")).pack(side="left")
-        ttk.Button(self.notepad_toolbar, text="Adicionar separação", command=self.add_separator).pack(side="left")
-        ttk.Button(self.notepad_toolbar, text="Salvar Alterações", command=self.save_notepad).pack(side="right")
+        ttk.Button(self.notepad_toolbar, text="𝙉", command=lambda: self.notepad_text.tag_add("bold", "sel.first", "sel.last")).pack(side="left")
+        ttk.Button(self.notepad_toolbar, text="𝙄", command=lambda: self.notepad_text.tag_add("italic", "sel.first", "sel.last")).pack(side="left")
+        ttk.Button(self.notepad_toolbar, text="S͟", command=lambda: self.notepad_text.tag_add("underline", "sel.first", "sel.last")).pack(side="left")
+        ttk.Button(self.notepad_toolbar, text="Adicionar linha", command=self.add_separator).pack(side="left")
+        ttk.Button(self.notepad_toolbar, text="Salvar", command=self.save_notepad).pack(side="right")
 
         self.notepad_text.tag_config("bold", font=("Helvetica", "12", "bold"))
         self.notepad_text.tag_config("italic", font=("Helvetica", "12", "italic"))
@@ -355,16 +415,13 @@ class SupportApp:
         for tag in tags:
             self.notepad_text.tag_add(tag["tag"], tag["start"], tag["end"])
 
-        # Ocultar ou mostrar o bloco de notas com base na configuração
         if not self.config["notepad_expanded"]:
             self.notepad_frame.pack_forget()
 
     def add_separator(self):
-        """Adiciona uma linha separadora no bloco de notas."""
         self.notepad_text.insert(tk.END, "\n______________________\n")
 
     def save_notepad(self):
-        """Salva o conteúdo do bloco de notas."""
         content = self.notepad_text.get("1.0", tk.END)
         tags = []
         for tag in self.notepad_text.tag_names():
@@ -381,10 +438,10 @@ class SupportApp:
         self.notepad_manager.save_notepad(content, tags)
 
     def refresh_gui(self):
-        """Atualiza a interface gráfica."""
         for widget in self.root.winfo_children():
             widget.destroy()
         self.setup_ui()
+        self.adjust_window_geometry()  # Ajustar a geometria ao recarregar a interface
 
 
 if __name__ == "__main__":
