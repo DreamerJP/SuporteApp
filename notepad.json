@@ -1,4 +1,25 @@
 {
-    "text": "\n",
-    "tags": []
+    "text": "EXEMPLO \nEXEMPLO\nEXEMPLO\nEXEMPLO\n______________________\n\n\n",
+    "tags": [
+        {
+            "tag": "bold",
+            "start": "1.0",
+            "end": "1.7"
+        },
+        {
+            "tag": "italic",
+            "start": "2.0",
+            "end": "2.7"
+        },
+        {
+            "tag": "italic",
+            "start": "3.0",
+            "end": "3.7"
+        },
+        {
+            "tag": "underline",
+            "start": "3.0",
+            "end": "3.7"
+        }
+    ]
 }
