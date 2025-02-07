@@ -1,1 +1,1 @@
-pyinstaller --onefile --noconsole --add-data "background.png; SuporteApp.py
+pyinstaller --onefile --noconsole --icon="CAMINHO DO ico.ico" --add-data "click.wav;." --add-data "background.png;." --runtime-tmpdir=. SuporteApp.py
