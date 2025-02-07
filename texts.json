@@ -1,10 +1,10 @@
 [
     [
-        "Bom dia! Em que posso ajudar? 😊",
+        "Bom dia! \nEm que posso ajudar? 😊",
         "Início atendimento"
     ],
     [
-        "Boa tarde! 😀 Como posso ajudar?",
+        "Boa tarde! 😀 \nComo posso ajudar?",
         "Início atendimento tarde"
     ],
     [
@@ -16,8 +16,44 @@
         "Conexão verificada"
     ],
     [
+        "Não estou conseguindo acessar o roteador remotamente. Pode reiniciá-lo?  Basta retirar da tomada por cerca de 5 segundos, em seguida conectar novamente.",
+        "Sem acesso roteador"
+    ],
+    [
+        "Pode me informar algum exemplo de site/aplicativo que costuma acessar e notar este problema?",
+        "Exemplo de site/app"
+    ],
+    [
+        "Por gentileza, qual o CPF do titular?",
+        "CPF TITULAR"
+    ],
+    [
+        "É possível me enviar uma foto dos equipamentos de internet, que mostre principalmente a parte dos cabos conectados?",
+        "FOTO EQUIPAMENTOS"
+    ],
+    [
+        "Já realizou o procedimento de retirar os equipamentos de internet da tomada por alguns segundos, em seguida conectar novamente?",
+        "REINICIOU EQUIPAMENTOS?"
+    ],
+    [
+        "Havendo mais alguma dúvida ou problema com a conexão, por favor entre em contato novamente.\nTenha um ótimo dia! 😀",
+        "ENCERRAR ATENDIMENTO"
+    ],
+    [
+        "Identifiquei que a conexão está bloqueada. Um momento por favor, que transferirei ao setor responsável.",
+        "BLOQUEIO"
+    ],
+    [
+        "Um momento por favor, que transferirei ao setor responsável.",
+        "Transferir"
+    ],
+    [
         "Nesse caso ofereço uma visita técnica para verificação dos equipamentos de internet, e o local em que eles estão instalados.\nAlgumas vezes o aparelho pode estar instalado em um local que não propaga bem o sinal Wi-Fi e outros cômodos podem não chegar o sinal.\nAssim o técnico pode recomendar as opções, que seria a troca dos equipamentos de local, a instalação de um ponto adicional, ou se for um problema no próprio roteador ele já realiza o reparo.\n\nA visita técnica não tem custo, e caso seja identificado um problema nos equipamentos realizaremos o reparo também sem custo.\nJá os serviços de instalação de um ponto adicional, e mudança dos equipamentos de local, tem um custo.\nSe o técnico identificar a necessidade ele vai lhe indicar, assim caso aprove, podemos agendar uma visita para realizar o serviço.",
-        "Visita técnica"
+        "Visita sinal wifi fraco"
+    ],
+    [
+        "As visitas no período da tarde ocorrem entre as 13h30 e 18h. Elas têm duração variada, e infelizmente não tenho como informar um horário específico. Mas caso tenha alguma restrição de horário é só me informar, que aviso ao técnico.  Assim ele evitará passar no horário que não poderá atendê-lo. ",
+        "Horário visita"
     ],
     [
         "Reservamos o direito de acesso às configurações do roteador aos nossos técnicos, a fim de garantir que as configurações estejam de acordo para o funcionamento da internet.\nCaso seja alguma configuração especifica que necessite, ou alguma informação podemos passar por atendimento mesmo.\n\nSe fizer questão de receber os dados de acesso posso fornecer, porém informo que em caso que essas configurações sofram alterações e resultem na falta de internet/necessidade de uma visita técnica para reconfiguração e reparo, a visita poderá ter o custo do chamado técnico.\nGostaria de alguma informação ou ajuste especifico das configurações do roteador, ou prefere receber os dados de acesso do mesmo?",
@@ -32,31 +68,7 @@
         "Fim de turno"
     ],
     [
-        "Há alguns requisitos para realização do teste de velocidade. Como a velocidade da banda contratada é muito alta, celulares, ou dispositivos conectados na rede Wi-Fi não costumam ser fortes o suficiente para atingir a velocidade máxima, e o teste fica limitado a capacidade do dispositivo/tecnologia WiFi.",
-        "Requisitos para teste de velocidade"
-    ],
-    [
-        "Recomendamos para teste um computador conectado via cabo de rede. O computador e o cabo tem que suportar conexão gigabit (superior a 100mega). Recomendamos também os sites speedtest.net / fast.com / nperf.com Outros sites por possuir muita propaganda acabam interferindo no resultado, ou não tendo servidores próximos disponíveis.",
-        "Sites recomendados"
-    ],
-    [
-        "Caso não tenha um computador via cabo de rede disponível o teste pode ser realizado via Wi-Fi, porém cada rede Wi-Fi e dispositivo possuem capacidade diferente. Por exemplo dispositivos conectados na rede Wi-Fi 2.4Ghz costumam atingir a velocidade máxima de 40 a 50mega. Já na rede Wi-Fi 5Ghz pode chegar a média de 250mega.",
-        "Teste via Wi-Fi"
-    ],
-    [
-        "Não estou conseguindo acessar o roteador remotamente. Pode reiniciá-lo? Basta retirar da tomada por cerca de 5 segundos, em seguida conectar novamente.",
-        "Reiniciar roteador"
-    ],
-    [
-        "Boa tarde! 😀\nPode me informar algum exemplo de site/aplicativo que costuma acessar e notar este problema?",
-        "Exemplo de site/aplicativo"
-    ],
-    [
-        "Devido ao termino do meu turno, estou encerrando este atendimento, a fim de que outro técnico possa lhe atender, caso você precise. Havendo algo mais para auxiliarmos por favor entre em contato novamente. Tenha uma ótima noite! 😀",
-        "Encerramento do atendimento"
-    ],
-    [
-        "As visitas no período da tarde ocorrem entre as 13h30 e 18h. Devido à duração variada das visitas, não tenho como informar um horário específico. Caso tenha alguma restrição de horário, basta me informar, que aviso ao técnico para não passar no horário que não estará disponível.",
-        "Horário das visitas"
+        "CANAIS WI-FI, DNS, BANDA WI-FI, AUTO. SINAL FIBRA DENTRO DO PADRÃO. IPV6 E UPNP ATIVOS. REINICIADO EQUIPAMENTOS E ORIENTADO A TESTAR. CLIENTE CONFIRMA MELHORA.",
+        "Finalizar OS"
     ]
 ]
