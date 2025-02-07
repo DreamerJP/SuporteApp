@@ -33,7 +33,8 @@ class ConfigManager:
             "btn_bg_color": DEFAULT_BTN_BG_COLOR,
             "edit_btn_bg_color": DEFAULT_EDIT_BTN_BG_COLOR,
             "show_edit_buttons": True,
-            "window_size": DEFAULT_WINDOW_SIZE,
+            "window_size_normal": DEFAULT_WINDOW_SIZE,
+            "window_size_notepad": "800x800+100+100",  # Tamanho padrão com bloco de notas
             "notepad_expanded": True,
             "last_bg_image_path": DEFAULT_BG_IMAGE_PATH,
             "last_bg_color": DEFAULT_BG_COLOR,
@@ -109,19 +110,22 @@ class NotepadManager:
             json.dump(data, file, ensure_ascii=False, indent=4)
 
 class SupportApp:
-    """Classe principal do aplicativo."""
     def __init__(self, root):
         self.root = root
-        self.root.title("Versão Suporte 2.0")
+        self.root.title("Versão Suporte 2.1")
 
+        # Primeiro inicializa os gerenciadores
         self.config_manager = ConfigManager()
         self.text_manager = TextManager()
         self.notepad_manager = NotepadManager()
 
-        self.root.geometry(self.config_manager.config["window_size"])
-
-        self.config = self.config_manager.config
+        # DEPOIS carrega as configurações
+        self.config = self.config_manager.config  # <--- Aqui está a correção
         self.texts = self.text_manager.texts
+
+        # Agora sim define a geometria
+        initial_size = self.config["window_size_notepad" if self.config["notepad_expanded"] else "window_size_normal"]
+        self.root.geometry(initial_size)
 
         self.setup_ui()
         pygame.mixer.init()
@@ -145,10 +149,18 @@ class SupportApp:
         self.root.bind("<Configure>", self.save_window_size)
 
     def save_window_size(self, event):
-        if event.widget == self.root:
-            self.config["window_size"] = self.root.wm_geometry()
+            """Salva o tamanho atual da janela no estado correto."""
+            if event.widget == self.root:
+                current_geometry = self.root.wm_geometry()
+        
+            # Salva no estado correto
+            if self.config["notepad_expanded"]:
+                self.config["window_size_notepad"] = current_geometry
+            else:
+                self.config["window_size_normal"] = current_geometry
+        
             self.config_manager.save_config()
-
+            
     def load_bg_image(self):
         try:
             self.bg_image = tk.PhotoImage(file=self.config["bg_image_path"])
@@ -278,7 +290,7 @@ class SupportApp:
     def show_about(self):
         about_window = tk.Toplevel(self.root)
         about_window.title("Sobre")
-        tk.Label(about_window, text="Versão Suporte 2.0\nDesenvolvido por Paulo Gama\nDreamerJPMG@gmail.com").pack(padx=20, pady=20)
+        tk.Label(about_window, text="Versão Suporte 2.1\nDesenvolvido por Paulo Gama\nDreamerJPMG@gmail.com").pack(padx=20, pady=20)
         ttk.Button(about_window, text="Fechar", command=about_window.destroy).pack(pady=10)
 
     def toggle_sound(self):
@@ -341,16 +353,33 @@ class SupportApp:
         self.refresh_gui()
 
     def toggle_notepad(self):
-        self.config["notepad_expanded"] = not self.config["notepad_expanded"]
-        self.view_menu.entryconfig(4, label="Ocultar Bloco de Notas" if self.config["notepad_expanded"] else "Exibir Bloco de Notas")
+        """Alterna a visibilidade do bloco de notas e ajusta a janela."""
+        # 1. Salvar geometria atual ANTES de mudar o estado
+        current_geometry = self.root.wm_geometry()
     
         if self.config["notepad_expanded"]:
+            self.config["window_size_notepad"] = current_geometry
+        else:
+            self.config["window_size_normal"] = current_geometry
+
+        # 2. Alternar o estado
+        self.config["notepad_expanded"] = not self.config["notepad_expanded"]
+    
+        # 3. Aplicar nova geometria baseada no NOVO estado
+        if self.config["notepad_expanded"]:
+            nova_geometria = self.config["window_size_notepad"]
             self.notepad_frame.pack(fill="both", expand=True)
         else:
+            nova_geometria = self.config["window_size_normal"]
             self.notepad_frame.pack_forget()
+
+        # 4. Forçar redimensionamento imediato
+        self.root.geometry(nova_geometria)
+        self.root.update_idletasks()
     
-        # Ajustar a geometria da janela
-        self.adjust_window_geometry()
+        # 5. Atualizar menu e salvar configuração
+        self.view_menu.entryconfig(4, label="Ocultar Bloco de Notas" if self.config["notepad_expanded"] else "Exibir Bloco de Notas")
+        self.config_manager.save_config()
 
     def adjust_window_geometry(self):
         # Obter a geometria atual da janela
@@ -438,10 +467,20 @@ class SupportApp:
         self.notepad_manager.save_notepad(content, tags)
 
     def refresh_gui(self):
+        notepad_state = self.config["notepad_expanded"]
+        
         for widget in self.root.winfo_children():
             widget.destroy()
+        
         self.setup_ui()
-        self.adjust_window_geometry()  # Ajustar a geometria ao recarregar a interface
+        
+        # Restaura geometria correta após recriação da UI
+        if notepad_state:
+            self.root.geometry(self.config["window_size_notepad"])
+        else:
+            self.root.geometry(self.config["window_size_normal"])
+        
+        self.root.update_idletasks()
 
 
 if __name__ == "__main__":
