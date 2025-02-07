@@ -22,7 +22,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='suporte',
+    name='SuporteApp',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -35,5 +35,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['C:\\dist\\Versão Suporte - Com bloco de notas 1.5\\Script\\ico.ico'],
+    icon=['C:\\dist\\Versão Suporte - 1.6\\Script\\ico.ico'],
 )
