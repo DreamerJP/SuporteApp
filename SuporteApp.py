@@ -2,66 +2,48 @@ import tkinter as tk
 from tkinter import simpledialog, scrolledtext, filedialog
 import json
 import os
-import sys
-import winsound
+import winsound  # Importa a biblioteca de sons
 
 class SupportApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Versão Suporte técnico")
 
-        # Determinar o caminho base do executável
-        if getattr(sys, 'frozen', False):
-            self.base_path = sys._MEIPASS
-        else:
-            self.base_path = os.path.dirname(os.path.abspath(__file__))
-
         # Carregar configurações
         self.load_config()
 
-        self.root.configure(bg=self.bg_color)
+        self.root.configure(bg=self.bg_color)  # Cor de fundo da janela principal
 
         # Carregar imagem de fundo
-        self.load_background_image()
+        self.bg_image_path = os.path.join(os.path.dirname(__file__), "background.png")
+        self.bg_image = tk.PhotoImage(file=self.bg_image_path)
 
         self.texts = []
         self.load_texts()
         self.create_widgets()
         self.create_menu()
 
-    def load_background_image(self):
-        """Carrega a imagem de fundo do diretório do executável"""
-        try:
-            bg_path = os.path.join(self.base_path, "background.png")
-            self.bg_image = tk.PhotoImage(file=bg_path)
-            self.bg_image_path = bg_path
-        except Exception as e:
-            print(f"Erro ao carregar imagem de fundo: {e}")
-            self.bg_image = None
-            self.bg_image_path = ""
-
     def create_widgets(self):
-        if self.bg_image:
-            self.canvas = tk.Canvas(self.root, width=self.bg_image.width(), height=self.bg_image.height())
-            self.canvas.pack(fill="both", expand=True)
-            self.canvas.create_image(0, 0, image=self.bg_image, anchor="nw")
-        else:
-            # Fallback se a imagem não for encontrada
-            self.canvas = tk.Canvas(self.root, bg=self.bg_color)
-            self.canvas.pack(fill="both", expand=True)
+        self.canvas = tk.Canvas(self.root, width=self.bg_image.width(), height=self.bg_image.height())
+        self.canvas.pack(fill="both", expand=True)
+        self.canvas.create_image(0, 0, image=self.bg_image, anchor="nw")
 
+        button_frame = tk.Frame(self.canvas, bg=self.bg_color)
+        self.canvas.create_window(10, 10, anchor="nw", window=button_frame)
+
+        column = 0
+        row = 0
         for idx, (text, resumo) in enumerate(self.texts):
-            frame = tk.Frame(self.canvas, bg=self.bg_color)
-            self.canvas.create_window(10, 10 + idx * 60, anchor="nw", window=frame)
+            button = tk.Button(button_frame, text=resumo, command=lambda t=text: self.copy_to_clipboard(t), bg=self.btn_bg_color, fg=self.btn_fg_color, relief="flat")
+            button.grid(row=row, column=column, padx=5, pady=5)
 
-            button = tk.Button(frame, text=resumo, command=lambda t=text: self.copy_to_clipboard(t), bg=self.btn_bg_color, fg=self.btn_fg_color, relief="flat")
-            button.pack(side="left", padx=5)
+            edit_button = tk.Button(button_frame, text="Editar", command=lambda idx=idx: self.open_edit_window(idx), bg=self.edit_btn_bg_color, fg=self.btn_fg_color, relief="flat")
+            edit_button.grid(row=row+1, column=column, padx=5, pady=5)
 
-            edit_button = tk.Button(frame, text="Editar", command=lambda idx=idx: self.open_edit_window(idx), bg=self.edit_btn_bg_color, fg=self.btn_fg_color, relief="flat")
-            edit_button.pack(side="left", padx=5)
-
-        exit_button = tk.Button(self.root, text="Sair", command=self.root.quit, bg="#95A5A6", fg="#2C3E50", relief="flat")
-        exit_button.pack(pady=20, anchor="se")
+            row += 2
+            if row > 16:  # Ajuste esse valor para controlar a quantidade de linhas
+                row = 0
+                column += 1
 
     def create_menu(self):
         menu_bar = tk.Menu(self.root)
@@ -83,7 +65,7 @@ class SupportApp:
         self.root.clipboard_clear()
         self.root.clipboard_append(text)
         if self.sound_enabled:
-            self.root.after(1, lambda: winsound.PlaySound("click.wav", winsound.SND_FILENAME | winsound.SND_ASYNC))
+            self.root.after(1, lambda: winsound.PlaySound("click.wav", winsound.SND_FILENAME | winsound.SND_ASYNC))  # SOM
 
     def open_edit_window(self, idx):
         edit_window = tk.Toplevel(self.root)
@@ -118,26 +100,19 @@ class SupportApp:
         self.refresh_gui()
 
     def load_config(self):
-        default_path = os.path.join(self.base_path, "background.png")
-        
         if os.path.exists("config.txt"):
             try:
                 with open("config.txt", "r") as file:
                     config = json.load(file)
-                    # Verificar se o caminho salvo ainda existe
-                    if os.path.exists(config.get("bg_image_path", "")):
-                        self.bg_image_path = config["bg_image_path"]
-                    else:
-                        self.bg_image_path = default_path
-                    
+                    self.bg_image_path = config.get("bg_image_path", os.path.join(os.path.dirname(__file__), "background.png"))
                     self.sound_enabled = config.get("sound_enabled", True)
                     self.dark_mode = config.get("dark_mode", False)
             except json.JSONDecodeError:
-                self.bg_image_path = default_path
+                self.bg_image_path = os.path.join(os.path.dirname(__file__), "background.png")
                 self.sound_enabled = True
                 self.dark_mode = False
         else:
-            self.bg_image_path = default_path
+            self.bg_image_path = os.path.join(os.path.dirname(__file__), "background.png")
             self.sound_enabled = True
             self.dark_mode = False
 
@@ -169,18 +144,12 @@ class SupportApp:
             json.dump(self.texts, file, ensure_ascii=False, indent=4)
 
     def change_bg_image(self):
-        file_path = filedialog.askopenfilename(
-            filetypes=[("Image files", "*.png;*.jpg;*.jpeg;*.gif")],
-            initialdir=self.base_path  # Começa a procurar no diretório do executável
-        )
+        file_path = filedialog.askopenfilename(filetypes=[("Image files", "*.png;*.jpg;*.jpeg;*.gif")])
         if file_path:
-            try:
-                self.bg_image_path = file_path
-                self.bg_image = tk.PhotoImage(file=file_path)
-                self.save_config()
-                self.refresh_gui()
-            except Exception as e:
-                print(f"Erro ao carregar nova imagem: {e}")
+            self.bg_image_path = file_path
+            self.bg_image = tk.PhotoImage(file=file_path)
+            self.save_config()
+            self.refresh_gui()
 
     def refresh_gui(self):
         for widget in self.root.winfo_children():
