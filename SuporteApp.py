@@ -12,10 +12,15 @@ import time
 import shutil
 
 # Constantes para cores e caminhos de arquivo
-DEFAULT_BG_COLOR = "#FFFFFF"          # Cor de fundo padrão
-DARK_BG_COLOR = "#000000"              # Cor de fundo no modo escuro
+DEFAULT_BG_COLOR = "#FFFFFF"  # Cor de fundo padrão
+DARK_BG_COLOR = "#000000"     # Cor de fundo no modo escuro
+SEPIA_BG_COLOR = "#F4EBD0"    # Cor de fundo sepia
+SEPIA_TEXT_COLOR = "#5A4A42"  # Cor do texto no tema sepia
+SEPIA_BUTTON_BG = "#D2B48C"   # Cor de fundo dos botões no tema sepia
+SEPIA_BUTTON_FG = "#5A4A42"   # Cor do texto dos botões no tema sepia
 DEFAULT_WINDOW_SIZE = "800x600+100+100"
 DEFAULT_BG_IMAGE_PATH = "background.png"
+SEPIA_BG_IMAGE_PATH = "sepia_background.png"  # Caminho para a imagem de fundo do modo sepia
 CONFIG_FILE = "config.txt"
 TEXTS_FILE = "texts.json"
 NOTEPAD_FILE = "notepad.json"
@@ -275,7 +280,7 @@ class SupportApp:
         except Exception as e:
             print(f"Icone não carregado: {e}")
         
-        self.current_version = "2.7"
+        self.current_version = "2.8"
         self.updater = Updater(self.current_version)
         self.check_updates()
 
@@ -322,6 +327,30 @@ class SupportApp:
         self.create_menu()
         self.create_notepad_widget()
         self.root.bind("<Configure>", self.save_window_size)
+        self.style = ttk.Style()
+        self.style.theme_use('clam')
+
+        # Configurações de cores com base no modo atual
+        if self.config["dark_mode"] == "dark":
+            self.style.configure('TButton', font=('Helvetica', 8), padding=3, background='black', foreground='white')
+            self.style.map('TButton', 
+                background=[('pressed', '#333333'), ('active', '#444444')],
+                foreground=[('pressed', 'white'), ('active', 'white')]
+            )
+        elif self.config["dark_mode"] == "sepia":
+            self.style.configure('TButton', font=('Helvetica', 8), padding=3, background=SEPIA_BUTTON_BG, foreground=SEPIA_BUTTON_FG)
+            self.style.map('TButton', 
+                background=[('pressed', '#C4A484'), ('active', '#D2B48C')],
+                foreground=[('pressed', SEPIA_TEXT_COLOR), ('active', SEPIA_TEXT_COLOR)]
+            )
+        else:
+            self.style.configure('TButton', font=('Helvetica', 8), padding=3, background='white', foreground='black')
+            self.style.map('TButton', 
+                background=[('pressed', '#dddddd'), ('active', '#cccccc')],
+                foreground=[('pressed', 'black'), ('active', 'black')]
+            )
+
+        self.style.configure('TFrame', background=self.config["bg_color"])
 
     def save_window_size(self, event):
             """Salva o tamanho atual da janela no estado correto."""
@@ -337,7 +366,10 @@ class SupportApp:
             
     def load_bg_image(self):
         try:
-            self.bg_image = tk.PhotoImage(file=self.config["bg_image_path"])
+            if self.config["dark_mode"] == "sepia":
+                self.bg_image = tk.PhotoImage(file=SEPIA_BG_IMAGE_PATH)
+            else:
+                self.bg_image = tk.PhotoImage(file=self.config["bg_image_path"])
         except tk.TclError:
             # Exibe mensagem de erro e permite ao usuário selecionar uma nova imagem
             tk.messagebox.showerror("Erro", "Não foi possível carregar a imagem de fundo.")
@@ -374,7 +406,7 @@ class SupportApp:
         frame = tk.Frame(self.canvas)
         self.canvas.create_window(10, 10, anchor="nw", window=frame)
 
-        self.scrollbar = ttk.Scrollbar(frame, orient="vertical", command=self.canvas.yview)
+        self.scrollbar = tk.Scrollbar(frame, orient="vertical", command=self.canvas.yview)
         self.scrollbar.pack(side="right", fill="y")
 
         button_frame = tk.Frame(frame, bg=self.config["bg_color"])
@@ -386,7 +418,8 @@ class SupportApp:
     def create_buttons(self, button_frame):
         column, row = 0, 0
         for idx, (text, resumo) in enumerate(self.texts):
-            button = ttk.Button(button_frame, text=resumo, command=lambda t=text: self.copy_to_clipboard(t))
+            button = ttk.Button(button_frame, text=resumo, style='TButton', 
+                              command=lambda t=text: self.copy_to_clipboard(t))
             button.grid(row=row, column=column, padx=5, pady=5, sticky="nsew")
 
             edit_button = ttk.Button(button_frame, text="Editar", command=lambda idx=idx: self.open_edit_window(idx))
@@ -442,13 +475,15 @@ class SupportApp:
         menu_bar = tk.Menu(self.root)
         self.root.config(menu=menu_bar)
 
+        # Menu "Visual"
         self.view_menu = tk.Menu(menu_bar, tearoff=0)
         menu_bar.add_cascade(label="Visual", menu=self.view_menu)
+
+        # Adiciona a opção "Temas"
+        self.view_menu.add_command(label="Temas", command=self.open_theme_selector)
+
+        # Outras opções do menu "Visual"
         self.view_menu.add_command(label="Alterar Plano de Fundo", command=self.change_bg_image)
-        self.view_menu.add_command(
-            label="Desativar Modo Noturno" if self.config["dark_mode"] else "Ativar Modo Noturno",
-            command=self.toggle_dark_mode
-        )
         self.view_menu.add_command(label="Editar Cor de fundo", command=self.edit_colors)
         self.view_menu.add_command(
             label="Ocultar Botões de Edição" if self.config["show_edit_buttons"] else "Exibir Botões de Edição",
@@ -459,6 +494,7 @@ class SupportApp:
             command=self.toggle_notepad
         )
 
+        # Menu "Som"
         self.sound_menu = tk.Menu(menu_bar, tearoff=0)
         menu_bar.add_cascade(label="Som", menu=self.sound_menu)
         self.sound_menu.add_command(
@@ -466,83 +502,125 @@ class SupportApp:
             command=self.toggle_sound
         )
 
+        # Menu "Ajuda"
         help_menu = tk.Menu(menu_bar, tearoff=0)
         menu_bar.add_cascade(label="Ajuda", menu=help_menu)
         help_menu.add_command(label="Sobre", command=self.show_about)
 
-    def show_about(self):
-        about_window = tk.Toplevel(self.root)
-        about_window.title("Sobre")
-        about_window.geometry("400x300")  # Aumenta a largura e altura da janela
+    def open_theme_selector(self):
+        """Abre a janela de seleção de temas com preview."""
+        theme_window = tk.Toplevel(self.root)
+        theme_window.title("Selecionar Tema")
+        theme_window.geometry("620x450")
 
-        # Adiciona informações sobre a versão
-        tk.Label(about_window, text="Versão Suporte 2.7\n").pack(padx=20, pady=(20, 5))
+        # Frame para organizar os temas
+        theme_frame = tk.Frame(theme_window, bg=self.config["bg_color"])
+        theme_frame.pack(padx=20, pady=20, fill="both", expand=True)
 
-        # Nome do desenvolvedor
-        nome_label = tk.Label(about_window, text="Paulo Gama", fg="blue", cursor="hand2")
-        nome_label.pack(padx=20, pady=(5, 5))
-        nome_label.bind("<1>", lambda event: self.start_snake_game(about_window))
+        # Configuração do grid para expansão
+        theme_frame.grid_columnconfigure(0, weight=1)
+        theme_frame.grid_columnconfigure(1, weight=1)
+        theme_frame.grid_columnconfigure(2, weight=1)
+        theme_frame.grid_rowconfigure(0, weight=1)
+        theme_frame.grid_rowconfigure(1, weight=1)
 
-        # Email do desenvolvedor
-        email_label = tk.Label(about_window, text="DreamerJPMG@gmail.com", fg="green", cursor="hand2")
-        email_label.pack(padx=20, pady=(5, 10))
-        email_label.bind("<1>", lambda event: self.copy_to_clipboard("DreamerJPMG@gmail.com"))
+        # Tema Claro
+        light_theme_btn = tk.Button(
+            theme_frame,
+            text="Modo Claro",
+            command=lambda: self.apply_theme("light"),
+            bg="white", fg="black",
+            font=('Helvetica', 12, 'bold'),
+            padx=10, pady=10
+        )
+        light_theme_btn.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
 
-        # Adiciona informações sobre as tecnologias utilizadas
-        tk.Label(about_window, text="Tecnologias utilizadas:").pack(padx=20, pady=(5, 5))
+        # Adiciona uma miniatura (preview) para o tema claro
+        try:
+            light_preview = tk.PhotoImage(file="light_theme_preview.png")  # Substitua pelo caminho da imagem
+            light_preview_label = tk.Label(theme_frame, image=light_preview, bg=self.config["bg_color"])
+            light_preview_label.image = light_preview  # Mantém uma referência para evitar garbage collection
+            light_preview_label.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
+        except Exception as e:
+            print(f"Erro ao carregar miniatura do tema claro: {e}")
 
-        # Texto com quebra automática
-        tecnologias = "Python, Tkinter, Pygame, JSON, Requests, Subprocess, Tempfile, Random, Time, OS, Sys, TTK (Themed Tkinter), ScrolledText, Messagebox, Filedialog, Simpledialog, shutil."
-        tk.Label(about_window, text=tecnologias, wraplength=350, justify="left").pack(padx=20, pady=(5, 10))
-        
-        # Informações sobre o desenvolvimento
-        tk.Label(about_window, text="Desenvolvido como um projeto pessoal.").pack(padx=20, pady=(5, 5))
-        
-    def start_snake_game(self, about_window):
-        about_window.destroy()
-        snake_game = tk.Toplevel(self.root)
-        SnakeGame(snake_game)
+        # Tema Escuro
+        dark_theme_btn = tk.Button(
+            theme_frame,
+            text="Modo Escuro",
+            command=lambda: self.apply_theme("dark"),
+            bg="black", fg="white",
+            font=('Helvetica', 12, 'bold'),
+            padx=10, pady=10
+        )
+        dark_theme_btn.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
+
+        # Adiciona uma miniatura (preview) para o tema escuro
+        try:
+            dark_preview = tk.PhotoImage(file="dark_theme_preview.png")  # Substitua pelo caminho da imagem
+            dark_preview_label = tk.Label(theme_frame, image=dark_preview, bg=self.config["bg_color"])
+            dark_preview_label.image = dark_preview  # Mantém uma referência para evitar garbage collection
+            dark_preview_label.grid(row=1, column=1, padx=10, pady=10, sticky="nsew")
+        except Exception as e:
+            print(f"Erro ao carregar miniatura do tema escuro: {e}")
+
+        # Tema Sepia
+        sepia_theme_btn = tk.Button(
+            theme_frame,
+            text="Modo Sepia",
+            command=lambda: self.apply_theme("sepia"),
+            bg=SEPIA_BUTTON_BG, fg=SEPIA_BUTTON_FG,
+            font=('Helvetica', 12, 'bold'),
+            padx=10, pady=10
+        )
+        sepia_theme_btn.grid(row=0, column=2, padx=10, pady=10, sticky="nsew")
+
+        # Adiciona uma miniatura (preview) para o tema sepia
+        try:
+            sepia_preview = tk.PhotoImage(file="sepia_theme_preview.png")  # Substitua pelo caminho da imagem
+            sepia_preview_label = tk.Label(theme_frame, image=sepia_preview, bg=self.config["bg_color"])
+            sepia_preview_label.image = sepia_preview  # Mantém uma referência para evitar garbage collection
+            sepia_preview_label.grid(row=1, column=2, padx=10, pady=10, sticky="nsew")
+        except Exception as e:
+            print(f"Erro ao carregar miniatura do tema sepia: {e}")
+
+    def apply_theme(self, theme):
+        """Aplica o tema selecionado."""
+        # Captura o conteúdo e as tags do bloco de notas antes de recriar a interface
+        notepad_content = self.notepad_text.get("1.0", tk.END).strip()  # Remove espaços em branco no final
+        notepad_tags = self._capture_tags()
+
+        if theme == "light":
+            self.config["dark_mode"] = "light"
+            self.config["bg_image_path"] = DEFAULT_BG_IMAGE_PATH  # Define o caminho da imagem padrão
+            self.config["last_bg_image_path"] = DEFAULT_BG_IMAGE_PATH  # Reseta o último caminho da imagem
+            self.config["bg_color"] = DEFAULT_BG_COLOR
+        elif theme == "dark":
+            self.config["dark_mode"] = "dark"
+            self.config["last_bg_image_path"] = self.config["bg_image_path"]  # Salva o caminho atual
+            self.config["last_bg_color"] = self.config["bg_color"]
+            self.config["bg_image_path"] = "ModoNoturno.png"
+            self.config["bg_color"] = DARK_BG_COLOR
+        elif theme == "sepia":
+            self.config["dark_mode"] = "sepia"
+            self.config["last_bg_image_path"] = self.config["bg_image_path"]  # Salva o caminho atual
+            self.config["last_bg_color"] = self.config["bg_color"]
+            self.config["bg_image_path"] = SEPIA_BG_IMAGE_PATH
+            self.config["bg_color"] = SEPIA_BG_COLOR
+
+        self.config_manager.save_config()
+        self.refresh_gui()
+
+        # Restaura o conteúdo e as tags do bloco de notas após recriar a interface
+        self.notepad_text.delete("1.0", tk.END)  # Limpa o conteúdo atual
+        self.notepad_text.insert(tk.END, notepad_content)  # Insere o conteúdo salvo
+        for tag in notepad_tags:
+            self.notepad_text.tag_add(tag["tag"], tag["start"], tag["end"])  # Restaura as tags
 
     def toggle_sound(self):
         self.config["sound_enabled"] = not self.config["sound_enabled"]
         self.sound_menu.entryconfig(0, label="Desativar Som de Clique" if self.config["sound_enabled"] else "Ativar Som de Clique")
         self.config_manager.save_config()
-
-    def toggle_dark_mode(self):
-        self.config["dark_mode"] = not self.config["dark_mode"]
-        self.view_menu.entryconfig(0, label="Desativar Modo Noturno" if self.config["dark_mode"] else "Ativar Modo Noturno")
-    
-        # Salvar o conteúdo atual do bloco de notas antes de recarregar a interface
-        notepad_content = self.notepad_text.get("1.0", tk.END)
-        notepad_tags = []
-        for tag in self.notepad_text.tag_names():
-            if tag != "sel":
-                ranges = self.notepad_text.tag_ranges(tag)
-                for i in range(0, len(ranges), 2):
-                    start = ranges[i]
-                    end = ranges[i + 1]
-                    notepad_tags.append({
-                        "tag": tag,
-                        "start": str(start),
-                        "end": str(end)
-                    })
-    
-        if self.config["dark_mode"]:
-            self.config["last_bg_image_path"] = self.config["bg_image_path"]
-            self.config["last_bg_color"] = self.config["bg_color"]
-            self.config["bg_image_path"] = "ModoNoturno.png"  # Imagem de fundo para o modo escuro
-            self.config["bg_color"] = DARK_BG_COLOR  # Usa a constante DARK_BG_COLOR
-        else:
-            self.config["bg_image_path"] = self.config.get("last_bg_image_path", DEFAULT_BG_IMAGE_PATH)
-            self.config["bg_color"] = self.config.get("last_bg_color", DEFAULT_BG_COLOR)
-    
-        self.config_manager.save_config()
-        self.refresh_gui()
-    
-        # Restaura o conteúdo do bloco de notas após a recarga
-        self.notepad_text.insert(tk.END, notepad_content)
-        for tag in notepad_tags:
-            self.notepad_text.tag_add(tag["tag"], tag["start"], tag["end"])
 
     def toggle_edit_buttons(self):
         self.config["show_edit_buttons"] = not self.config["show_edit_buttons"]
@@ -578,6 +656,44 @@ class SupportApp:
         # 5. Atualiza menu e salvar configuração
         self.view_menu.entryconfig(4, label="Ocultar Bloco de Notas" if self.config["notepad_expanded"] else "Exibir Bloco de Notas")
         self.config_manager.save_config()
+
+    def show_about(self):
+        """Exibe a janela 'Sobre' com informações do aplicativo."""
+        about_window = tk.Toplevel(self.root)
+        about_window.title("Sobre")
+        about_window.geometry("400x300")  # Aumenta a largura e altura da janela
+
+        # Adiciona informações sobre a versão
+        tk.Label(about_window, text="Versão Suporte 2.8\n").pack(padx=20, pady=(20, 5))
+
+        # Nome do desenvolvedor
+        nome_label = tk.Label(about_window, text="Paulo Gama", fg="blue", cursor="hand2")
+        nome_label.pack(padx=20, pady=(5, 5))
+        nome_label.bind("<1>", lambda event: self.start_snake_game(about_window))
+
+        # Email do desenvolvedor
+        email_label = tk.Label(about_window, text="DreamerJPMG@gmail.com", fg="green", cursor="hand2")
+        email_label.pack(padx=20, pady=(5, 10))
+        email_label.bind("<1>", lambda event: self.copy_to_clipboard("DreamerJPMG@gmail.com"))
+
+        # Adiciona informações sobre as tecnologias utilizadas
+        tk.Label(about_window, text="Tecnologias utilizadas:").pack(padx=20, pady=(5, 5))
+
+        # Texto com quebra automática
+        tecnologias = "Python, Tkinter, Pygame, JSON, Requests, Subprocess, Tempfile, Random, Time, OS, Sys, TTK (Themed Tkinter), ScrolledText, Messagebox, Filedialog, Simpledialog, shutil."
+        tk.Label(about_window, text=tecnologias, wraplength=350, justify="left").pack(padx=20, pady=(5, 10))
+        
+        # Informações sobre o desenvolvimento
+        tk.Label(about_window, text="Desenvolvido como um projeto pessoal.").pack(padx=20, pady=(5, 5))
+
+    def start_snake_game(self, about_window):
+        about_window.destroy()  # Fecha a janela "Sobre"
+        try:
+            snake_game = tk.Toplevel(self.root)  # Cria uma nova janela para o jogo
+            SnakeGame(snake_game)  # Inicializa o jogo Snake na nova janela
+        except Exception as e:
+            messagebox.showerror("Erro ao Iniciar o Jogo", f"Ocorreu um erro: {str(e)}")
+            print(f"Erro detalhado: {traceback.format_exc()}")
 
     def adjust_window_geometry(self):
         # Obten a geometria atual da janela
@@ -677,26 +793,44 @@ class SupportApp:
         self.notepad_frame = tk.Frame(self.root, bg=self.config["bg_color"])
         self.notepad_frame.pack(fill="both", expand=True)
 
-        self.notepad_text = scrolledtext.ScrolledText(self.notepad_frame, width=50, height=10, wrap=tk.WORD)
+        # Verifica o tema atual e define as cores do bloco de notas
+        if self.config["dark_mode"] == "dark":
+            notepad_bg_color = "black"
+            notepad_fg_color = "white"
+        elif self.config["dark_mode"] == "sepia":
+            notepad_bg_color = SEPIA_BG_COLOR
+            notepad_fg_color = SEPIA_TEXT_COLOR
+        else:
+            notepad_bg_color = "white"
+            notepad_fg_color = "black"
+
+        self.notepad_text = scrolledtext.ScrolledText(self.notepad_frame, width=50, height=10, wrap=tk.WORD, bg=notepad_bg_color, fg=notepad_fg_color)
         self.notepad_text.pack(padx=10, pady=10, fill="both", expand=True)
 
         self.notepad_toolbar = tk.Frame(self.notepad_frame, bg=self.config["bg_color"])
         self.notepad_toolbar.pack(fill="x", side="top")
 
-        ttk.Button(self.notepad_toolbar, text="𝙉", command=lambda: self.notepad_text.tag_add("bold", "sel.first", "sel.last")).pack(side="left")
-        ttk.Button(self.notepad_toolbar, text="𝙄", command=lambda: self.notepad_text.tag_add("italic", "sel.first", "sel.last")).pack(side="left")
-        ttk.Button(self.notepad_toolbar, text="S͟", command=lambda: self.notepad_text.tag_add("underline", "sel.first", "sel.last")).pack(side="left")
-        ttk.Button(self.notepad_toolbar, text="Adicionar linha", command=self.add_separator).pack(side="left")
-        ttk.Button(self.notepad_toolbar, text="Salvar", command=self.save_notepad).pack(side="right")
+        # Botões com tamanho fixo
+        ttk.Button(self.notepad_toolbar, text="𝙉", width=3, command=lambda: self.notepad_text.tag_add("bold", "sel.first", "sel.last")).pack(side="left", padx=2)
+        ttk.Button(self.notepad_toolbar, text="𝙄", width=3, command=lambda: self.notepad_text.tag_add("italic", "sel.first", "sel.last")).pack(side="left", padx=2)
+        ttk.Button(self.notepad_toolbar, text="S͟", width=3, command=lambda: self.notepad_text.tag_add("underline", "sel.first", "sel.last")).pack(side="left", padx=2)
+        ttk.Button(self.notepad_toolbar, text="Adicionar linha", command=self.add_separator).pack(side="left", padx=2)
+    
+        # Botão Salvar alinhado à esquerda e com tamanho fixo
+        ttk.Button(self.notepad_toolbar, text="Salvar", width=10, command=self.save_notepad).pack(side="left", padx=2)
 
-        self.notepad_text.tag_config("bold", font=("Helvetica", "12", "bold"))
-        self.notepad_text.tag_config("italic", font=("Helvetica", "12", "italic"))
-        self.notepad_text.tag_config("underline", font=("Helvetica", "12", "underline"))
+        default_font = ("Helvetica", "10")  # Tamanho da fonte padrão
+        self.notepad_text.tag_config("bold", font=(default_font[0], default_font[1], "bold"))
+        self.notepad_text.tag_config("italic", font=(default_font[0], default_font[1], "italic"))
+        self.notepad_text.tag_config("underline", font=(default_font[0], default_font[1], "underline"))
 
-        text, tags = self.notepad_manager.load_notepad()
-        self.notepad_text.insert(tk.END, text)
-        for tag in tags:
-            self.notepad_text.tag_add(tag["tag"], tag["start"], tag["end"])
+        # Carrega o conteúdo do bloco de notas
+        if not hasattr(self, 'notepad_initialized'):
+            text, tags = self.notepad_manager.load_notepad()
+            self.notepad_text.insert(tk.END, text)
+            for tag in tags:
+                self.notepad_text.tag_add(tag["tag"], tag["start"], tag["end"])
+                self.notepad_initialized = True  # Marca como inicializado
 
         if not self.config["notepad_expanded"]:
             self.notepad_frame.pack_forget()
@@ -780,14 +914,14 @@ class SupportApp:
 
     def _restore_state(self, text, tags):
         """Restaura o texto e as tags no bloco de notas."""
-        self.notepad_text.delete("1.0", tk.END)
-        self.notepad_text.insert(tk.END, text)
-        
+        self.notepad_text.delete("1.0", tk.END)  # Limpa o conteúdo atual
+        self.notepad_text.insert(tk.END, text)  # Insere o conteúdo salvo
+    
         # Remove todas as tags existentes
         for tag in self.notepad_text.tag_names():
             if tag != "sel":
                 self.notepad_text.tag_remove(tag, "1.0", tk.END)
-        
+    
         # Aplica as tags
         for tag in tags:
             self.notepad_text.tag_add(tag["tag"], tag["start"], tag["end"])
@@ -813,19 +947,30 @@ class SupportApp:
 
     def refresh_gui(self):
         notepad_state = self.config["notepad_expanded"]
-        
+
         for widget in self.root.winfo_children():
             widget.destroy()
-        
+
         self.setup_ui()
-        
+
         # Restaura geometria correta após recriação da UI
         if notepad_state:
             self.root.geometry(self.config["window_size_notepad"])
         else:
             self.root.geometry(self.config["window_size_normal"])
-        
+
         self.root.update_idletasks()
+
+        # Aplica as cores do tema sepia
+        if self.config["dark_mode"] == "sepia":
+            self.root.configure(bg=SEPIA_BG_COLOR)
+            self.style.configure('TButton', background=SEPIA_BUTTON_BG, foreground=SEPIA_BUTTON_FG)
+            self.style.map('TButton', 
+                background=[('pressed', '#C4A484'), ('active', '#D2B48C')],
+                foreground=[('pressed', SEPIA_TEXT_COLOR), ('active', SEPIA_TEXT_COLOR)]
+            )
+            self.style.configure('TFrame', background=SEPIA_BG_COLOR)
+            self.notepad_text.config(bg=SEPIA_BG_COLOR, fg=SEPIA_TEXT_COLOR)
 
 class SnakeGame:
     def __init__(self, master):
