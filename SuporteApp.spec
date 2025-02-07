@@ -35,5 +35,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['C:\\dist\\Versão Suporte - 1.6\\Script\\ico.ico'],
+    icon=['C:\\dist\\Versão Suporte - 1.8\\Script\\ico.ico'],
 )
