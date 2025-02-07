@@ -1,6 +1,6 @@
 [
     [
-        "Bom dia! \nEm que posso ajudar? 😀",
+        "Bom dia! 😀\nEm que posso ajudar?",
         "Início atendimento"
     ],
     [
@@ -16,7 +16,7 @@
         "Conexão verificada"
     ],
     [
-        "Não estou conseguindo acessar o roteador remotamente. Pode reiniciá-lo?  Basta retirar da tomada por cerca de 5 segundos, em seguida conectar novamente.",
+        "Não estou conseguindo acessar o roteador remotamente. \nPode reiniciá-lo?  \nBasta retirar da tomada por cerca de 5 segundos, em seguida conectar novamente.",
         "Sem acesso roteador"
     ],
     [
@@ -56,7 +56,7 @@
         "Horário visita"
     ],
     [
-        "Reservamos o direito de acesso às configurações do roteador aos nossos técnicos, a fim de garantir que as configurações estejam de acordo para o funcionamento da internet.\nCaso seja alguma configuração especifica que necessite, ou alguma informação podemos passar por atendimento mesmo.\n\nSe fizer questão de receber os dados de acesso posso fornecer, porém informo que em caso que essas configurações sofram alterações e resultem na falta de internet/necessidade de uma visita técnica para reconfiguração e reparo, a visita poderá ter o custo do chamado técnico.\nGostaria de alguma informação ou ajuste especifico das configurações do roteador, ou prefere receber os dados de acesso do mesmo?",
+        "Reservamos o direito de acesso às configurações do roteador aos nossos técnicos, a fim de garantir que as configurações estejam de acordo para o funcionamento da internet.\nPossibilitamos alterar configurações remotamente pelo atendimento, caso necessite de alguma função específica, como o redirecionamento de portas por exemplo.\n\nSe fizer questão de receber os dados de acesso posso fornecer, porém informo que em caso que essas configurações sofram alterações e resultem na falta de internet/necessidade de uma visita técnica para reconfiguração e reparo, a visita poderá ter o custo do chamado técnico.\nGostaria de alguma informação ou ajuste especifico das configurações do roteador, ou prefere receber os dados de acesso do mesmo?",
         "Senha de acesso Router"
     ],
     [
