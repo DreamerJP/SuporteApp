@@ -352,7 +352,7 @@ class SupportApp:
         elif self.config["dark_mode"] == "sepia":
             self.style.configure('TButton', font=('Helvetica', 8), padding=3, background=SEPIA_BUTTON_BG, foreground=SEPIA_BUTTON_FG)
             self.style.map('TButton', 
-                background=[('pressed', '#C4A484'), ('active', '#D2B48C')],
+                background=[('pressed', '#C4A484'), ('active', '#B8860B')],
                 foreground=[('pressed', SEPIA_TEXT_COLOR), ('active', SEPIA_TEXT_COLOR)]
             )
         else:
@@ -628,7 +628,8 @@ class SupportApp:
         self.notepad_text.insert(tk.END, notepad_content)  # Insere o conteúdo salvo
         for tag in notepad_tags:
             self.notepad_text.tag_add(tag["tag"], tag["start"], tag["end"])  # Restaura as tags
-
+        self.update_button_styles()
+        
     def toggle_sound(self):
         self.config["sound_enabled"] = not self.config["sound_enabled"]
         self.sound_menu.entryconfig(0, label="Desativar Som de Clique" if self.config["sound_enabled"] else "Ativar Som de Clique")
@@ -978,11 +979,18 @@ class SupportApp:
             self.root.configure(bg=SEPIA_BG_COLOR)
             self.style.configure('TButton', background=SEPIA_BUTTON_BG, foreground=SEPIA_BUTTON_FG)
             self.style.map('TButton', 
-                background=[('pressed', '#C4A484'), ('active', '#D2B48C')],
-                foreground=[('pressed', SEPIA_TEXT_COLOR), ('active', SEPIA_TEXT_COLOR)]
+                background=[('pressed', '#C4A484'), ('active', '#B8860B')],
+                foreground=[('pressed', SEPIA_BUTTON_FG), ('active', SEPIA_BUTTON_FG)]
             )
+            self.update_button_styles()
             self.style.configure('TFrame', background=SEPIA_BG_COLOR)
             self.notepad_text.config(bg=SEPIA_BG_COLOR, fg=SEPIA_TEXT_COLOR)
+
+
+    def update_button_styles(self):
+        for widget in self.root.winfo_children():
+            if isinstance(widget, ttk.Button):
+                widget.configure(style='TButton')
 
 class SnakeGame:
     def __init__(self, master):
