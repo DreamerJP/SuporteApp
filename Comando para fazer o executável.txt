@@ -1,1 +1,1 @@
-pyinstaller --onefile --noconsole --icon="ico.ico" --add-data "ico.ico;." --add-data "dark_theme_preview.png;." --add-data "light_theme_preview.png;." --add-data "sepia_theme_preview.png;." --add-data "sepia_background.png;." --version-file=version_info.txt --runtime-tmpdir=. SuporteApp.py
+pyinstaller --onefile --noconsole --icon="ico.ico" --add-data "ico.ico;." --add-data "dark_theme_preview.png;." --add-data "light_theme_preview.png;." --add-data "sepia_theme_preview.png;." --version-file=version_info.txt --runtime-tmpdir=. SuporteApp.py
