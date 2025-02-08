@@ -1,4 +1,13 @@
 {
     "version": "2.8",
-    "download_url": "https://github.com/DreamerJP/SuporteApp/releases/download/v2.8/SuporteApp.exe"
+    "files": [
+        {
+            "name": "SuporteApp.exe",
+            "download_url": "https://github.com/DreamerJP/SuporteApp/releases/download/v2.8/SuporteApp.exe"
+        },
+        {
+            "name": "dark_theme_preview.png",
+            "download_url": "https://github.com/DreamerJP/SuporteApp/releases/download/v2.8/dark_theme_preview.png"
+        }
+    ]
 }
