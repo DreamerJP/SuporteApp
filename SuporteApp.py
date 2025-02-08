@@ -11,6 +11,15 @@ import requests
 import time
 import shutil
 
+def get_resource_path(relative_path):
+    """Obtém caminho correto para recursos tanto em desenvolvimento quanto no executável"""
+    if getattr(sys, 'frozen', False):
+        base_path = sys._MEIPASS
+    else:
+        base_path = os.path.abspath(".")
+    
+    return os.path.join(base_path, relative_path)
+
 # Constantes para cores e caminhos de arquivo
 DEFAULT_BG_COLOR = "#FFFFFF"  # Cor de fundo padrão
 DARK_BG_COLOR = "#000000"     # Cor de fundo no modo escuro
@@ -20,7 +29,10 @@ SEPIA_BUTTON_BG = "#D2B48C"   # Cor de fundo dos botões no tema sepia
 SEPIA_BUTTON_FG = "#5A4A42"   # Cor do texto dos botões no tema sepia
 DEFAULT_WINDOW_SIZE = "800x600+100+100"
 DEFAULT_BG_IMAGE_PATH = "background.png"
-SEPIA_BG_IMAGE_PATH = "sepia_background.png"  # Caminho para a imagem de fundo do modo sepia
+LIGHT_THEME_PREVIEW_PATH = get_resource_path("light_theme_preview.png")
+DARK_THEME_PREVIEW_PATH = get_resource_path("dark_theme_preview.png")
+SEPIA_THEME_PREVIEW_PATH = get_resource_path("sepia_theme_preview.png")
+SEPIA_BG_IMAGE_PATH = get_resource_path("sepia_background.png")
 CONFIG_FILE = "config.txt"
 TEXTS_FILE = "texts.json"
 NOTEPAD_FILE = "notepad.json"
@@ -535,11 +547,11 @@ class SupportApp:
         )
         light_theme_btn.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
 
-        # Adiciona uma miniatura (preview) para o tema claro
+        # Adiciona preview do tema claro
         try:
-            light_preview = tk.PhotoImage(file="light_theme_preview.png")  # Substitua pelo caminho da imagem
+            light_preview = tk.PhotoImage(file=LIGHT_THEME_PREVIEW_PATH)
             light_preview_label = tk.Label(theme_frame, image=light_preview, bg=self.config["bg_color"])
-            light_preview_label.image = light_preview  # Mantém uma referência para evitar garbage collection
+            light_preview_label.image = light_preview
             light_preview_label.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
         except Exception as e:
             print(f"Erro ao carregar miniatura do tema claro: {e}")
@@ -555,11 +567,11 @@ class SupportApp:
         )
         dark_theme_btn.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
 
-        # Adiciona uma miniatura (preview) para o tema escuro
+        # Adiciona preview do tema escuro
         try:
-            dark_preview = tk.PhotoImage(file="dark_theme_preview.png")  # Substitua pelo caminho da imagem
+            dark_preview = tk.PhotoImage(file=DARK_THEME_PREVIEW_PATH)
             dark_preview_label = tk.Label(theme_frame, image=dark_preview, bg=self.config["bg_color"])
-            dark_preview_label.image = dark_preview  # Mantém uma referência para evitar garbage collection
+            dark_preview_label.image = dark_preview
             dark_preview_label.grid(row=1, column=1, padx=10, pady=10, sticky="nsew")
         except Exception as e:
             print(f"Erro ao carregar miniatura do tema escuro: {e}")
@@ -575,11 +587,11 @@ class SupportApp:
         )
         sepia_theme_btn.grid(row=0, column=2, padx=10, pady=10, sticky="nsew")
 
-        # Adiciona uma miniatura (preview) para o tema sepia
+        # Adiciona preview do tema sepia
         try:
-            sepia_preview = tk.PhotoImage(file="sepia_theme_preview.png")  # Substitua pelo caminho da imagem
+            sepia_preview = tk.PhotoImage(file=SEPIA_THEME_PREVIEW_PATH)
             sepia_preview_label = tk.Label(theme_frame, image=sepia_preview, bg=self.config["bg_color"])
-            sepia_preview_label.image = sepia_preview  # Mantém uma referência para evitar garbage collection
+            sepia_preview_label.image = sepia_preview
             sepia_preview_label.grid(row=1, column=2, padx=10, pady=10, sticky="nsew")
         except Exception as e:
             print(f"Erro ao carregar miniatura do tema sepia: {e}")
