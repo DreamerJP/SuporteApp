@@ -278,6 +278,45 @@ class NotepadManager:
         }
         with open(self.notepad_path, "w", encoding="utf-8") as file:
             json.dump(data, file, ensure_ascii=False, indent=4)
+class Tooltip:
+    def __init__(self, widget, text):
+        self.widget = widget
+        self.text = text
+        self.tip_window = None
+        self.id = None
+        self.x = self.y = 0
+        self.widget.bind("<Enter>", self.showtip)
+        self.widget.bind("<Leave>", self.hidetip)
+
+    def showtip(self, event=None):
+        "Exibe o tooltip com pequeno delay"
+        self.id = self.widget.after(100, self.display_tip)
+
+    def display_tip(self):
+        "Cria e exibe a janela do tooltip"
+        if self.tip_window or not self.text:
+            return
+        x, y, _, _ = self.widget.bbox("insert")
+        x += self.widget.winfo_rootx() + 25
+        y += self.widget.winfo_rooty() + 25
+        
+        self.tip_window = tw = tk.Toplevel(self.widget)
+        tw.wm_overrideredirect(True)
+        tw.wm_geometry(f"+{x}+{y}")
+        
+        label = tk.Label(tw, text=self.text, justify=tk.LEFT,
+                        background="#ffffe0", relief=tk.SOLID, borderwidth=1,
+                        font=("tahoma", "8", "normal"))
+        label.pack()
+
+    def hidetip(self, event=None):
+        "Remove o tooltip"
+        if self.tip_window:
+            self.tip_window.destroy()
+        self.tip_window = None
+        if self.id:
+            self.widget.after_cancel(self.id)
+            self.id = None
 
 class SupportApp:
     def __init__(self, root):
@@ -292,7 +331,7 @@ class SupportApp:
         except Exception as e:
             print(f"Icone não carregado: {e}")
         
-        self.current_version = "2.8"
+        self.current_version = "2.9"
         self.updater = Updater(self.current_version)
         self.check_updates()
 
@@ -314,9 +353,8 @@ class SupportApp:
         self.click_sound = None
         self.load_sound()
 
-        # Inicializa pilhas de undo e redo
+        # Inicializa pilhas de undo
         self.undo_stack = []
-        self.redo_stack = []
 
     def check_updates(self):
         version_info = self.updater.check_for_updates()
@@ -377,9 +415,11 @@ class SupportApp:
                 self.config_manager.save_config()
             
     def load_bg_image(self):
+        """Carrega a imagem de fundo com base nas configurações atuais."""
         try:
-            if self.config["dark_mode"] == "sepia":
-                self.bg_image = tk.PhotoImage(file=SEPIA_BG_IMAGE_PATH)
+            # Usa o caminho da imagem definido nas configurações
+            if self.config["bg_image_path"] == "sepia_background.png":
+                self.bg_image = tk.PhotoImage(file=os.path.join(sys._MEIPASS, self.config["bg_image_path"]))
             else:
                 self.bg_image = tk.PhotoImage(file=self.config["bg_image_path"])
         except tk.TclError:
@@ -402,11 +442,11 @@ class SupportApp:
                     # Se a imagem padrão também não existir, exibe erro e continua sem imagem
                     tk.messagebox.showerror("Erro", "Imagem padrão não encontrada. Verifique o arquivo.")
                     self.bg_image = None
-
+                    
     def select_bg_image(self):
         file_path = filedialog.askopenfilename(
             title="Selecione a imagem de fundo",
-            filetypes=[("Image files", "*.png;*.jpg;*.jpeg;*.gif")]
+            filetypes=[("Image files", "*.png")]
         )
         return file_path if file_path else DEFAULT_BG_IMAGE_PATH
 
@@ -598,36 +638,22 @@ class SupportApp:
 
     def apply_theme(self, theme):
         """Aplica o tema selecionado."""
-        # Captura o conteúdo e as tags do bloco de notas antes de recriar a interface
-        notepad_content = self.notepad_text.get("1.0", tk.END).strip()  # Remove espaços em branco no final
-        notepad_tags = self._capture_tags()
-
         if theme == "light":
             self.config["dark_mode"] = "light"
             self.config["bg_image_path"] = DEFAULT_BG_IMAGE_PATH  # Define o caminho da imagem padrão
-            self.config["last_bg_image_path"] = DEFAULT_BG_IMAGE_PATH  # Reseta o último caminho da imagem
             self.config["bg_color"] = DEFAULT_BG_COLOR
         elif theme == "dark":
             self.config["dark_mode"] = "dark"
-            self.config["last_bg_image_path"] = self.config["bg_image_path"]  # Salva o caminho atual
-            self.config["last_bg_color"] = self.config["bg_color"]
-            self.config["bg_image_path"] = "ModoNoturno.png"
+            self.config["bg_image_path"] = "ModoNoturno.png"  # Define o caminho da imagem do tema escuro
             self.config["bg_color"] = DARK_BG_COLOR
         elif theme == "sepia":
             self.config["dark_mode"] = "sepia"
-            self.config["last_bg_image_path"] = self.config["bg_image_path"]  # Salva o caminho atual
-            self.config["last_bg_color"] = self.config["bg_color"]
-            self.config["bg_image_path"] = SEPIA_BG_IMAGE_PATH
+            self.config["bg_image_path"] =  "sepia_background.png"  # Define o caminho da imagem do tema sépia
             self.config["bg_color"] = SEPIA_BG_COLOR
 
+        # Salva as configurações e atualiza a interface
         self.config_manager.save_config()
         self.refresh_gui()
-
-        # Restaura o conteúdo e as tags do bloco de notas após recriar a interface
-        self.notepad_text.delete("1.0", tk.END)  # Limpa o conteúdo atual
-        self.notepad_text.insert(tk.END, notepad_content)  # Insere o conteúdo salvo
-        for tag in notepad_tags:
-            self.notepad_text.tag_add(tag["tag"], tag["start"], tag["end"])  # Restaura as tags
         self.update_button_styles()
         
     def toggle_sound(self):
@@ -677,7 +703,7 @@ class SupportApp:
         about_window.geometry("400x300")  # Aumenta a largura e altura da janela
 
         # Adiciona informações sobre a versão
-        tk.Label(about_window, text="Versão Suporte 2.8\n").pack(padx=20, pady=(20, 5))
+        tk.Label(about_window, text="Versão Suporte 2.9\n").pack(padx=20, pady=(20, 5))
 
         # Nome do desenvolvedor
         nome_label = tk.Label(about_window, text="Paulo Gama", fg="blue", cursor="hand2")
@@ -723,7 +749,7 @@ class SupportApp:
         self.root.geometry(f"{width}x{new_height}+{x}+{y}")
 
     def change_bg_image(self):
-        file_path = filedialog.askopenfilename(filetypes=[("Image files", "*.png;*.jpg;*.jpeg;*.gif")])
+        file_path = filedialog.askopenfilename(filetypes=[("Image files", "*.png")])
         if file_path:
             self.config["bg_image_path"] = file_path
             self.config_manager.save_config()
@@ -817,22 +843,67 @@ class SupportApp:
             notepad_bg_color = "white"
             notepad_fg_color = "black"
 
-        self.notepad_text = scrolledtext.ScrolledText(self.notepad_frame, width=50, height=10, wrap=tk.WORD, bg=notepad_bg_color, fg=notepad_fg_color)
+        default_font = ("Helvetica", 10)
+        self.notepad_text = scrolledtext.ScrolledText(
+            self.notepad_frame, 
+            width=50, 
+            height=10, 
+            wrap=tk.WORD, 
+            font=default_font, 
+            bg=notepad_bg_color, 
+            fg=notepad_fg_color
+        )
         self.notepad_text.pack(padx=10, pady=10, fill="both", expand=True)
 
         self.notepad_toolbar = tk.Frame(self.notepad_frame, bg=self.config["bg_color"])
         self.notepad_toolbar.pack(fill="x", side="top")
 
-        # Botões com tamanho fixo
-        ttk.Button(self.notepad_toolbar, text="𝙉", width=3, command=lambda: self.notepad_text.tag_add("bold", "sel.first", "sel.last")).pack(side="left", padx=2)
-        ttk.Button(self.notepad_toolbar, text="𝙄", width=3, command=lambda: self.notepad_text.tag_add("italic", "sel.first", "sel.last")).pack(side="left", padx=2)
-        ttk.Button(self.notepad_toolbar, text="S͟", width=3, command=lambda: self.notepad_text.tag_add("underline", "sel.first", "sel.last")).pack(side="left", padx=2)
-        ttk.Button(self.notepad_toolbar, text="Adicionar linha", command=self.add_separator).pack(side="left", padx=2)
-    
-        # Botão Salvar alinhado à esquerda e com tamanho fixo
-        ttk.Button(self.notepad_toolbar, text="Salvar", width=10, command=self.save_notepad).pack(side="left", padx=2)
+        # Botões com toggle de formatação
+        bold_btn = ttk.Button(
+            self.notepad_toolbar, 
+            text="𝙉", 
+            width=3, 
+            command=lambda: self.toggle_tag("bold")
+        )
+        bold_btn.pack(side="left", padx=2)
+        Tooltip(bold_btn, "Negrito - Clique para aplicar/remover todas as formatações")
 
-        default_font = ("Helvetica", "10")  # Tamanho da fonte padrão
+        italic_btn = ttk.Button(
+            self.notepad_toolbar,
+            text="𝙄", 
+            width=3, 
+            command=lambda: self.toggle_tag("italic")
+        )
+        italic_btn.pack(side="left", padx=2)
+        Tooltip(italic_btn, "Itálico - Clique para aplicar/remover todas as formatações")
+
+        underline_btn = ttk.Button(
+            self.notepad_toolbar,
+            text="S͟", 
+            width=3, 
+            command=lambda: self.toggle_tag("underline")
+        )
+        underline_btn.pack(side="left", padx=2)
+        Tooltip(underline_btn, "Sublinhado - Clique para aplicar/remover todas as formatações")
+
+        separator_btn = ttk.Button(
+            self.notepad_toolbar,
+            text="Adicionar linha", 
+            command=self.add_separator
+        )
+        separator_btn.pack(side="left", padx=2)
+        Tooltip(separator_btn, "Inserir Linha Divisória")
+
+        save_btn = ttk.Button(
+            self.notepad_toolbar,
+            text="Salvar", 
+            width=10, 
+            command=self.save_notepad
+        )
+        save_btn.pack(side="left", padx=2)
+        Tooltip(save_btn, "Salvar Conteúdo (Ctrl+S)")
+
+        # Configuração das tags
         self.notepad_text.tag_config("bold", font=(default_font[0], default_font[1], "bold"))
         self.notepad_text.tag_config("italic", font=(default_font[0], default_font[1], "italic"))
         self.notepad_text.tag_config("underline", font=(default_font[0], default_font[1], "underline"))
@@ -843,20 +914,48 @@ class SupportApp:
             self.notepad_text.insert(tk.END, text)
             for tag in tags:
                 self.notepad_text.tag_add(tag["tag"], tag["start"], tag["end"])
-                self.notepad_initialized = True  # Marca como inicializado
+            self.notepad_initialized = True
 
         if not self.config["notepad_expanded"]:
             self.notepad_frame.pack_forget()
 
-        # Vincula eventos de teclado para undo/redo
+        # Vincula eventos de teclado
         self.notepad_text.bind("<Control-z>", self.undo)
-        self.notepad_text.bind("<Control-y>", self.redo)
-        self.notepad_text.bind("<Control-Z>", self.undo)  # Para sistemas que usam Shift
-        self.notepad_text.bind("<Control-Y>", self.redo)  # Para sistemas que usam Shift
+        self.notepad_text.bind("<Control-Z>", self.undo)
+        self.notepad_text.bind("<Control-s>", lambda e: self.save_notepad())
+        self.notepad_text.bind("<Control-S>", lambda e: self.save_notepad())
+
 
         # Salva o estado após uma pausa na digitação
         self.save_timer = None
         self.notepad_text.bind("<KeyRelease>", self._schedule_save_state)
+
+    def toggle_tag(self, tag_name):
+        """Alterna a formatação da tag na seleção atual, removendo todas as tags se necessário"""
+        try:
+            sel_start = self.notepad_text.index("sel.first")
+            sel_end = self.notepad_text.index("sel.last")
+        
+            # Verifica se a tag específica está presente em toda a seleção
+            tag_present = all(
+                tag_name in self.notepad_text.tag_names(f"{index}.0")
+                for index in range(int(sel_start.split('.')[0]), int(sel_end.split('.')[0]) + 1)
+            )
+        
+            if tag_present:
+                # Se a tag já está presente, remove todas as tags da seleção
+                for tag in ["bold", "italic", "underline"]:
+                    self.notepad_text.tag_remove(tag, sel_start, sel_end)
+            else:
+                # Se a tag não está presente, remove todas as tags primeiro
+                for tag in ["bold", "italic", "underline"]:
+                    self.notepad_text.tag_remove(tag, sel_start, sel_end)
+                # Depois aplica a nova tag
+                self.notepad_text.tag_add(tag_name, sel_start, sel_end)
+            
+        except tk.TclError:
+            # Não há texto selecionado, não faz nada
+            pass
 
     def _schedule_save_state(self, event=None):
         """Agenda o salvamento do estado após uma pausa na digitação."""
@@ -877,9 +976,6 @@ class SupportApp:
         if self.undo_stack and self.undo_stack[-1] == (text, tags):
             return  # Evita salvar estados duplicados
         self.undo_stack.append((text, tags))
-        
-        # Limpa a pilha de redo (não faz sentido refazer após uma nova ação)
-        self.redo_stack.clear()
 
     def _capture_tags(self):
         """Captura todas as tags aplicadas no texto."""
@@ -902,27 +998,8 @@ class SupportApp:
         if not self.undo_stack:
             return  # Nada para desfazer
 
-        # Salva o estado atual na pilha de redo
-        current_text = self.notepad_text.get("1.0", tk.END)
-        current_tags = self._capture_tags()
-        self.redo_stack.append((current_text, current_tags))
-        
         # Restaura o estado anterior
         text, tags = self.undo_stack.pop()
-        self._restore_state(text, tags)
-
-    def redo(self, event=None):
-        """Refaz a última ação desfeita."""
-        if not self.redo_stack:
-            return  # Nada para refazer
-
-        # Salva o estado atual na pilha de undo
-        current_text = self.notepad_text.get("1.0", tk.END)
-        current_tags = self._capture_tags()
-        self.undo_stack.append((current_text, current_tags))
-        
-        # Restaura o estado futuro
-        text, tags = self.redo_stack.pop()
         self._restore_state(text, tags)
 
     def _restore_state(self, text, tags):
@@ -959,14 +1036,29 @@ class SupportApp:
         self.notepad_manager.save_notepad(content, tags)
 
     def refresh_gui(self):
-        notepad_state = self.config["notepad_expanded"]
+        # Captura o conteúdo e as tags do bloco de notas antes de destruir os widgets
+        if hasattr(self, 'notepad_text'):
+            notepad_content = self.notepad_text.get("1.0", tk.END).strip()
+            notepad_tags = self._capture_tags()
+        else:
+            notepad_content = ""
+            notepad_tags = []
 
+        # Destruir todos os widgets e recriar a interface
         for widget in self.root.winfo_children():
             widget.destroy()
 
         self.setup_ui()
 
-        # Restaura geometria correta após recriação da UI
+        # Restaura o conteúdo e as tags após recriar a interface
+        if hasattr(self, 'notepad_text') and notepad_content:
+            self.notepad_text.delete("1.0", tk.END)
+            self.notepad_text.insert(tk.END, notepad_content)
+            for tag in notepad_tags:
+                self.notepad_text.tag_add(tag["tag"], tag["start"], tag["end"])
+
+        # Restaura a geometria correta
+        notepad_state = self.config["notepad_expanded"]
         if notepad_state:
             self.root.geometry(self.config["window_size_notepad"])
         else:
@@ -974,7 +1066,7 @@ class SupportApp:
 
         self.root.update_idletasks()
 
-        # Aplica as cores do tema sepia
+        # Aplica as cores do tema sepia se necessário
         if self.config["dark_mode"] == "sepia":
             self.root.configure(bg=SEPIA_BG_COLOR)
             self.style.configure('TButton', background=SEPIA_BUTTON_BG, foreground=SEPIA_BUTTON_FG)
