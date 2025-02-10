@@ -3,7 +3,7 @@ Aplicativo para auxiliar atendimento em suporte técnico, podendo ser adaptador 
 
 
 Comando para criar executável:
-pyinstaller --onefile --noconsole --icon="ico.ico" --add-data "ico.ico;." --version-file=version_info.txt --runtime-tmpdir=. SuporteApp.py
+pyinstaller --onefile --noconsole --icon="ico.ico" --add-data "ico.ico;." --add-data "dark_theme_preview.png;." --add-data "light_theme_preview.png;." --add-data "sepia_theme_preview.png;." --add-data "sepia_background.png;." --version-file=version_info.txt --runtime-tmpdir=. SuporteApp.py
 
 
 <h1>Versão 2.8:</h1>
