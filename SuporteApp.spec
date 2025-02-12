@@ -5,7 +5,7 @@ a = Analysis(
     ['SuporteApp.py'],
     pathex=[],
     binaries=[],
-    datas=[('ico.ico', '.'), ('dark_theme_preview.png', '.'), ('light_theme_preview.png', '.'), ('sepia_theme_preview.png', '.'), ('sepia_background.png', '.')],
+    datas=[('ico.ico', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
