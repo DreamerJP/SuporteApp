@@ -3,12 +3,12 @@ Aplicativo para auxiliar atendimento em suporte técnico, podendo ser adaptador 
 
 
 Comando para criar executável:
-pyinstaller --onefile --noconsole --icon="ico.ico" --add-data "ico.ico;." --add-data "dark_theme_preview.png;." --add-data "light_theme_preview.png;." --add-data "sepia_theme_preview.png;." --add-data "sepia_background.png;." --version-file=version_info.txt --runtime-tmpdir=. SuporteApp.py
+pyinstaller --onefile --noconsole --icon="ico.ico" --add-data "ico.ico;." --version-file=version_info.txt --runtime-tmpdir=. SuporteApp.py
 
 
-<h1>Versão 2.8:</h1>
+<h1>Versão 3.0:</h1>
 
-![SuporteApp2 8](https://github.com/user-attachments/assets/0888289a-a8f6-46e1-9988-e34be40593c1)
+![SuporteApp3.0](https://github.com/user-attachments/assets/f9de63d1-83d2-46d7-a6cf-f717c110be91)
 
 
 <h1>Versão 1.0:</h1>
