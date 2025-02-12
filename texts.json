@@ -21,15 +21,15 @@
     ],
     [
         "Pode me informar algum exemplo de site/aplicativo que costuma acessar e notar este problema?",
-        "Exemplo de site/app"
+        "Pedir site/app exemplo"
     ],
     [
         "Por gentileza, qual o CPF do titular?",
-        "CPF Titular"
+        "Pedir CPF"
     ],
     [
         "É possível me enviar uma foto dos equipamentos de internet, que mostre principalmente a parte dos cabos conectados?",
-        "Foto equipamentos"
+        "Foto dos equipamentos"
     ],
     [
         "Já realizou o procedimento de retirar os equipamentos de internet da tomada por alguns segundos, em seguida conectar novamente?",
@@ -57,7 +57,7 @@
     ],
     [
         "Reservamos o direito de acesso às configurações do roteador aos nossos técnicos, a fim de garantir que as configurações estejam de acordo para o funcionamento da internet.\nPossibilitamos alterar configurações remotamente pelo atendimento, caso necessite de alguma função específica, como o redirecionamento de portas por exemplo.\n\nSe fizer questão de receber os dados de acesso posso fornecer, porém informo que em caso que essas configurações sofram alterações e resultem na falta de internet/necessidade de uma visita técnica para reconfiguração e reparo, a visita poderá ter o custo do chamado técnico.\nGostaria de alguma informação ou ajuste especifico das configurações do roteador, ou prefere receber os dados de acesso do mesmo?",
-        "Senha de acesso Router"
+        "Sobre senha roteador"
     ],
     [
         "Há alguns requisitos para realização do teste de velocidade.\nComo a velocidade da banda contratada é muito alta, celulares, ou dispositivos conectados na rede Wi-Fi não costumam ser fortes o suficiente para atingir a velocidade máxima, e o teste fica limitado a capacidade do dispositivo/tecnologia WiFi.\n\nRecomendamos para teste um computador conectado via cabo de rede.\nO computador e o cabo tem que suportar conexão gigabit (superior a 100mega).\nRecomendamos também os sites speedtest.net / fast.com / nperf.com\nOutros sites por possuir muita propaganda acabam interferindo no resultado, ou não tendo servidores próximos disponíveis. \n\nCaso não tenha um computador via cabo de rede disponível o teste pode ser realizado via Wi-Fi, porém cada rede Wi-Fi e dispositivo possuem capacidade diferente.\nPor exemplo dispositivos conectados na rede Wi-Fi 2.4Ghz costumam atingir a velocidade máxima de 40 a 50mega.\nJá na rede Wi-Fi 5Ghz pode chegar a média de 250mega.\nTambém há a variação de intensidade de sinal, e numero de dispositivos conectados, que pode interferir no resultado.\n\nLembrando que isso é apenas para realização dos testes de velocidade.\nCaso tenha alguma outra dúvida/problema sobre a conexão podemos verificar também!",
