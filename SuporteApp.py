@@ -22,17 +22,8 @@ def get_resource_path(relative_path):
 
 # Constantes para cores e caminhos de arquivo
 DEFAULT_BG_COLOR = "#FFFFFF"  # Cor de fundo padrão
-DARK_BG_COLOR = "#000000"     # Cor de fundo no modo escuro
-SEPIA_BG_COLOR = "#F4EBD0"    # Cor de fundo sepia
-SEPIA_TEXT_COLOR = "#5A4A42"  # Cor do texto no tema sepia
-SEPIA_BUTTON_BG = "#D2B48C"   # Cor de fundo dos botões no tema sepia
-SEPIA_BUTTON_FG = "#5A4A42"   # Cor do texto dos botões no tema sepia
 DEFAULT_WINDOW_SIZE = "800x600+100+100"
 DEFAULT_BG_IMAGE_PATH = "background.png"
-LIGHT_THEME_PREVIEW_PATH = get_resource_path("light_theme_preview.png")
-DARK_THEME_PREVIEW_PATH = get_resource_path("dark_theme_preview.png")
-SEPIA_THEME_PREVIEW_PATH = get_resource_path("sepia_theme_preview.png")
-SEPIA_BG_IMAGE_PATH = get_resource_path("sepia_background.png")
 CONFIG_FILE = "config.txt"
 TEXTS_FILE = "texts.json"
 NOTEPAD_FILE = "notepad.json"
@@ -203,7 +194,6 @@ class ConfigManager:
         self.default_config = {
             "bg_image_path": DEFAULT_BG_IMAGE_PATH,
             "sound_enabled": True,
-            "dark_mode": False,
             "bg_color": DEFAULT_BG_COLOR,
             "show_edit_buttons": True,
             "window_size_normal": DEFAULT_WINDOW_SIZE,
@@ -324,14 +314,13 @@ class SupportApp:
         self.root.title("SuporteApp")
 
         try:
-            if getattr(sys, 'frozen', False):  # Verifica se é executável compilado
-                # Caminho para o ícone nos recursos temporários do executável
+            if getattr(sys, 'frozen', False):
                 icon_path = os.path.join(sys._MEIPASS, "ico.ico")
                 self.root.iconbitmap(icon_path)
         except Exception as e:
             print(f"Icone não carregado: {e}")
         
-        self.current_version = "2.9"
+        self.current_version = "3.0"
         self.updater = Updater(self.current_version)
         self.check_updates()
 
@@ -344,9 +333,16 @@ class SupportApp:
         self.config = self.config_manager.config
         self.texts = self.text_manager.texts
 
-        # Define a geometria
-        initial_size = self.config["window_size_notepad" if self.config["notepad_expanded"] else "window_size_normal"]
+        # Define a geometria inicial
+        initial_size = self.config.get(
+            "window_size_notepad" if self.config["notepad_expanded"] else "window_size_normal",
+            DEFAULT_WINDOW_SIZE
+        )
         self.root.geometry(initial_size)
+        self.root.update_idletasks()  # Força atualização do layout
+
+        # Initialize button_windows
+        self.button_windows = []
 
         self.setup_ui()
         pygame.mixer.init()
@@ -372,35 +368,15 @@ class SupportApp:
 
     def setup_ui(self):
         self.root.configure(bg=self.config["bg_color"])
+        self.create_canvas()
         self.load_bg_image()
-        self.create_widgets()
+        self.create_buttons()
         self.create_menu()
         self.create_notepad_widget()
         self.root.bind("<Configure>", self.save_window_size)
         self.style = ttk.Style()
         self.style.theme_use('clam')
-
-        # Configurações de cores com base no modo atual
-        if self.config["dark_mode"] == "dark":
-            self.style.configure('TButton', font=('Helvetica', 8), padding=3, background='black', foreground='white')
-            self.style.map('TButton', 
-                background=[('pressed', '#333333'), ('active', '#444444')],
-                foreground=[('pressed', 'white'), ('active', 'white')]
-            )
-        elif self.config["dark_mode"] == "sepia":
-            self.style.configure('TButton', font=('Helvetica', 8), padding=3, background=SEPIA_BUTTON_BG, foreground=SEPIA_BUTTON_FG)
-            self.style.map('TButton', 
-                background=[('pressed', '#C4A484'), ('active', '#B8860B')],
-                foreground=[('pressed', SEPIA_TEXT_COLOR), ('active', SEPIA_TEXT_COLOR)]
-            )
-        else:
-            self.style.configure('TButton', font=('Helvetica', 8), padding=3, background='white', foreground='black')
-            self.style.map('TButton', 
-                background=[('pressed', '#dddddd'), ('active', '#cccccc')],
-                foreground=[('pressed', 'black'), ('active', 'black')]
-            )
-
-        self.style.configure('TFrame', background=self.config["bg_color"])
+        self.update_button_styles()
 
     def save_window_size(self, event):
             """Salva o tamanho atual da janela no estado correto."""
@@ -413,35 +389,36 @@ class SupportApp:
                     self.config["window_size_normal"] = current_geometry
         
                 self.config_manager.save_config()
+
+    def create_canvas(self):
+        self.canvas = tk.Canvas(self.root, bg=self.config["bg_color"])
+        self.canvas.pack(fill="both", expand=True)
             
     def load_bg_image(self):
-        """Carrega a imagem de fundo com base nas configurações atuais."""
+        """Carrega a imagem de fundo padrão ou personalizada"""
+        self.bg_image = None  # Inicializa bg_image como None
+
         try:
-            # Usa o caminho da imagem definido nas configurações
-            if self.config["bg_image_path"] == "sepia_background.png":
-                self.bg_image = tk.PhotoImage(file=os.path.join(sys._MEIPASS, self.config["bg_image_path"]))
-            else:
-                self.bg_image = tk.PhotoImage(file=self.config["bg_image_path"])
-        except tk.TclError:
-            # Exibe mensagem de erro e permite ao usuário selecionar uma nova imagem
-            tk.messagebox.showerror("Erro", "Não foi possível carregar a imagem de fundo.")
-            new_path = self.select_bg_image()
-            self.config["bg_image_path"] = new_path
-            self.config_manager.save_config()
-            try:
-                # Tenta carregar a nova imagem selecionada
-                self.bg_image = tk.PhotoImage(file=self.config["bg_image_path"])
-            except tk.TclError:
-                # Se falhar novamente, usa a imagem padrão e exibe erro
-                tk.messagebox.showerror("Erro", "A nova imagem também não pôde ser carregada. Usando imagem padrão.")
-                self.config["bg_image_path"] = DEFAULT_BG_IMAGE_PATH
-                self.config_manager.save_config()
-                try:
-                    self.bg_image = tk.PhotoImage(file=self.config["bg_image_path"])
-                except tk.TclError:
-                    # Se a imagem padrão também não existir, exibe erro e continua sem imagem
-                    tk.messagebox.showerror("Erro", "Imagem padrão não encontrada. Verifique o arquivo.")
-                    self.bg_image = None
+            self.bg_image = tk.PhotoImage(file=self.config["bg_image_path"])
+        except Exception as e:
+            print(f"Erro ao carregar imagem: {e}")
+        
+            # Solicita ao usuário para selecionar uma nova imagem
+            if messagebox.askyesno("Imagem de Fundo Não Encontrada", 
+                                     "O arquivo de imagem de fundo não foi encontrado. Deseja selecionar uma nova imagem?"):
+                new_image_path = self.select_bg_image()
+                if new_image_path:
+                    self.config["bg_image_path"] = new_image_path
+                    self.bg_image = tk.PhotoImage(file=new_image_path)
+                    self.config_manager.save_config()
+                else:
+                    # Se o usuário não selecionar uma nova imagem, inicia sem plano de fundo
+                    self.canvas.configure(bg=self.config["bg_color"])
+                    return
+        
+        # Adiciona a imagem ao canvas já criado, se a imagem foi carregada com sucesso
+        if self.bg_image:
+            self.canvas.create_image(0, 0, image=self.bg_image, anchor="nw")
                     
     def select_bg_image(self):
         file_path = filedialog.askopenfilename(
@@ -451,40 +428,73 @@ class SupportApp:
         return file_path if file_path else DEFAULT_BG_IMAGE_PATH
 
     def create_widgets(self):
-        self.canvas = tk.Canvas(self.root, width=self.bg_image.width(), height=self.bg_image.height())
+        self.canvas = tk.Canvas(self.root, bg=self.config["bg_color"])
         self.canvas.pack(fill="both", expand=True)
-        self.canvas.create_image(0, 0, image=self.bg_image, anchor="nw")
+    
+        if self.bg_image:
+            self.canvas.create_image(0, 0, image=self.bg_image, anchor="nw")
+    
+        self.create_buttons()
 
-        frame = tk.Frame(self.canvas)
-        self.canvas.create_window(10, 10, anchor="nw", window=frame)
+    def create_buttons(self):
+        # Limpar botões existentes
+        for btn in self.button_windows:
+            self.canvas.delete(btn)
+        self.button_windows = []
 
-        self.scrollbar = tk.Scrollbar(frame, orient="vertical", command=self.canvas.yview)
-        self.scrollbar.pack(side="right", fill="y")
+        # Configurações de posicionamento
+        start_x, start_y = 10, 10
+        button_width = 150
+        button_height = 30
+        padding = 5
+        max_colunas = 8
+        bots_por_coluna = 10
 
-        button_frame = tk.Frame(frame, bg=self.config["bg_color"])
-        button_frame.pack(side="left", fill="both", expand=True)
-
-        self.canvas.configure(yscrollcommand=self.scrollbar.set)
-        self.create_buttons(button_frame)
-
-    def create_buttons(self, button_frame):
-        column, row = 0, 0
         for idx, (text, resumo) in enumerate(self.texts):
-            button = ttk.Button(button_frame, text=resumo, style='TButton', 
-                              command=lambda t=text: self.copy_to_clipboard(t))
-            button.grid(row=row, column=column, padx=5, pady=5, sticky="nsew")
+            # Calcula coluna e linha conforme sistema anterior
+            col = idx // bots_por_coluna  # Cada coluna tem 10 botões
+            linha = idx % bots_por_coluna # 0-9
 
-            edit_button = ttk.Button(button_frame, text="Editar", command=lambda idx=idx: self.open_edit_window(idx))
+            # Para após atingir o máximo de colunas
+            if col >= max_colunas:
+                break
+
+            # Posição X baseada na coluna (cada coluna tem 100 + 25 + 10 = 135 de largura)
+            x = start_x + (col * 185)
+        
+            # Posição Y baseada na linha
+            y = start_y + (linha * (button_height + padding))
+
+            # Botão principal
+            btn = ttk.Button(self.canvas, text=resumo, command=lambda t=text: self.copy_to_clipboard(t))
+            btn_window = self.canvas.create_window(
+                x, 
+                y, 
+                anchor="nw", 
+                window=btn, 
+                width=button_width, 
+                height=button_height
+            )
+            self.button_windows.append(btn_window)
+
+            # Botão de edição
             if self.config["show_edit_buttons"]:
-                edit_button.grid(row=row + 1, column=column, padx=5, pady=5, sticky="nsew")
+                edit_btn = ttk.Button(self.canvas, text="✎", width=2, command=lambda i=idx: self.open_edit_window(i))
+                edit_window = self.canvas.create_window(
+                    x + button_width + 5,  # Posição ao lado do botão principal
+                    y, 
+                    anchor="nw", 
+                    window=edit_btn, 
+                    width=25, 
+                    height=button_height
+                )
+                self.button_windows.append(edit_window)
 
-            row += 2
-            if row > 16:
-                row = 0
-                column += 1
-
-        button_frame.update_idletasks()
-        self.canvas.config(scrollregion=self.canvas.bbox("all"))
+        # Atualizar scrollregion
+        total_colunas = min(len(self.texts) // bots_por_coluna + 1, max_colunas)
+        total_width = start_x + (total_colunas * 185)
+        total_height = start_y + (bots_por_coluna * (button_height + padding))
+        self.canvas.config(scrollregion=(0, 0, total_width, total_height))
 
     def copy_to_clipboard(self, text):
         self.root.clipboard_clear()
@@ -504,24 +514,81 @@ class SupportApp:
         tk.Label(edit_window, text="Nome do Botão:").pack(padx=10, pady=(10, 0))
         name_entry = tk.Entry(edit_window, width=50)
         name_entry.pack(padx=10, pady=(0, 10))
-        name_entry.insert(tk.END, self.texts[idx][1])  # Preenche com o nome atual do botão
+        name_entry.insert(tk.END, self.texts[idx][1])
 
         # Campo para editar o texto do botão
         tk.Label(edit_window, text="Texto do Botão:").pack(padx=10, pady=(10, 0))
         text_box = scrolledtext.ScrolledText(edit_window, wrap=tk.WORD, width=50, height=15)
         text_box.pack(padx=10, pady=(0, 10))
-        text_box.insert(tk.END, self.texts[idx][0])  # Preenche com o texto atual do botão
+        text_box.insert(tk.END, self.texts[idx][0])
+
+        # Frame para os botões de ação
+        button_frame = tk.Frame(edit_window)
+        button_frame.pack(pady=10)
 
         def save_text():
             new_text = text_box.get("1.0", tk.END).strip()
             new_name = name_entry.get()
             if new_name and new_text:
-                self.texts[idx] = (new_text, new_name)  # Atualiza tanto o texto quanto o nome
+                self.texts[idx] = (new_text, new_name)
                 self.text_manager.save_texts()
                 self.refresh_gui()
                 edit_window.destroy()
 
-        ttk.Button(edit_window, text="Salvar", command=save_text).pack(pady=10)
+        # Botão Salvar
+        ttk.Button(button_frame, text="Salvar", command=save_text).pack(side=tk.LEFT, padx=5)
+
+        # Botão Deletar
+        def delete_button():
+            if messagebox.askyesno("Confirmar", "Tem certeza que deseja deletar este botão?"):
+                del self.texts[idx]
+                self.text_manager.save_texts()
+                self.refresh_gui()
+                edit_window.destroy()
+
+        ttk.Button(button_frame, text="Deletar Botão", command=delete_button).pack(side=tk.LEFT, padx=5)
+
+    def add_new_button(self):
+        """Abre janela para adicionar novo botão com campos ampliados"""
+        add_window = tk.Toplevel(self.root)
+        add_window.title("Adicionar Novo Botão")
+        add_window.geometry("500x400")
+
+        # Nome do Botão (Label + Entry)
+        tk.Label(add_window, text="Nome do Botão:", font=('Arial', 10, 'bold')).pack(padx=10, pady=(10, 0))
+        name_entry = tk.Entry(add_window, width=50)
+        name_entry.pack(padx=10, pady=(0, 10))
+
+        # Texto do Botão (Label + ScrolledText)
+        tk.Label(add_window, text="Texto para Copiar:", font=('Arial', 10, 'bold')).pack(padx=10, pady=(10, 0))
+        text_box = scrolledtext.ScrolledText(
+            add_window, 
+            wrap=tk.WORD, 
+            width=50, 
+            height=15,
+            font=('Arial', 10)
+        )
+        text_box.pack(padx=10, pady=(0, 10))
+
+        # Botão de Confirmação
+        def confirm_add():
+            new_name = name_entry.get().strip()
+            new_text = text_box.get("1.0", tk.END).strip()
+        
+            if not new_name or not new_text:
+                messagebox.showerror("Erro", "Ambos os campos são obrigatórios!")
+                return
+            
+            self.texts.append((new_text, new_name))
+            self.text_manager.save_texts()
+            self.refresh_gui()
+            add_window.destroy()
+
+        ttk.Button(
+            add_window, 
+            text="Adicionar", 
+            command=confirm_add
+        ).pack(pady=10)
 
     def create_menu(self):
         menu_bar = tk.Menu(self.root)
@@ -531,12 +598,9 @@ class SupportApp:
         self.view_menu = tk.Menu(menu_bar, tearoff=0)
         menu_bar.add_cascade(label="Visual", menu=self.view_menu)
 
-        # Adiciona a opção "Temas"
-        self.view_menu.add_command(label="Temas", command=self.open_theme_selector)
-
         # Outras opções do menu "Visual"
         self.view_menu.add_command(label="Alterar Plano de Fundo", command=self.change_bg_image)
-        self.view_menu.add_command(label="Editar Cor de fundo", command=self.edit_colors)
+        self.view_menu.add_command(label="Editar esquema de cores", command=self.edit_colors)
         self.view_menu.add_command(
             label="Ocultar Botões de Edição" if self.config["show_edit_buttons"] else "Exibir Botões de Edição",
             command=self.toggle_edit_buttons
@@ -558,103 +622,12 @@ class SupportApp:
         help_menu = tk.Menu(menu_bar, tearoff=0)
         menu_bar.add_cascade(label="Ajuda", menu=help_menu)
         help_menu.add_command(label="Sobre", command=self.show_about)
-
-    def open_theme_selector(self):
-        """Abre a janela de seleção de temas com preview."""
-        theme_window = tk.Toplevel(self.root)
-        theme_window.title("Selecionar Tema")
-        theme_window.geometry("620x450")
-
-        # Frame para organizar os temas
-        theme_frame = tk.Frame(theme_window, bg=self.config["bg_color"])
-        theme_frame.pack(padx=20, pady=20, fill="both", expand=True)
-
-        # Configuração do grid para expansão
-        theme_frame.grid_columnconfigure(0, weight=1)
-        theme_frame.grid_columnconfigure(1, weight=1)
-        theme_frame.grid_columnconfigure(2, weight=1)
-        theme_frame.grid_rowconfigure(0, weight=1)
-        theme_frame.grid_rowconfigure(1, weight=1)
-
-        # Tema Claro
-        light_theme_btn = tk.Button(
-            theme_frame,
-            text="Modo Claro",
-            command=lambda: self.apply_theme("light"),
-            bg="white", fg="black",
-            font=('Helvetica', 12, 'bold'),
-            padx=10, pady=10
+        
+        # Menu "Adicionar botão"
+        menu_bar.add_command(
+            label="➕ Novo Botão",  # Ícone opcional para melhor visualização
+            command=self.add_new_button
         )
-        light_theme_btn.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
-
-        # Adiciona preview do tema claro
-        try:
-            light_preview = tk.PhotoImage(file=LIGHT_THEME_PREVIEW_PATH)
-            light_preview_label = tk.Label(theme_frame, image=light_preview, bg=self.config["bg_color"])
-            light_preview_label.image = light_preview
-            light_preview_label.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
-        except Exception as e:
-            print(f"Erro ao carregar miniatura do tema claro: {e}")
-
-        # Tema Escuro
-        dark_theme_btn = tk.Button(
-            theme_frame,
-            text="Modo Escuro",
-            command=lambda: self.apply_theme("dark"),
-            bg="black", fg="white",
-            font=('Helvetica', 12, 'bold'),
-            padx=10, pady=10
-        )
-        dark_theme_btn.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
-
-        # Adiciona preview do tema escuro
-        try:
-            dark_preview = tk.PhotoImage(file=DARK_THEME_PREVIEW_PATH)
-            dark_preview_label = tk.Label(theme_frame, image=dark_preview, bg=self.config["bg_color"])
-            dark_preview_label.image = dark_preview
-            dark_preview_label.grid(row=1, column=1, padx=10, pady=10, sticky="nsew")
-        except Exception as e:
-            print(f"Erro ao carregar miniatura do tema escuro: {e}")
-
-        # Tema Sepia
-        sepia_theme_btn = tk.Button(
-            theme_frame,
-            text="Modo Sepia",
-            command=lambda: self.apply_theme("sepia"),
-            bg=SEPIA_BUTTON_BG, fg=SEPIA_BUTTON_FG,
-            font=('Helvetica', 12, 'bold'),
-            padx=10, pady=10
-        )
-        sepia_theme_btn.grid(row=0, column=2, padx=10, pady=10, sticky="nsew")
-
-        # Adiciona preview do tema sepia
-        try:
-            sepia_preview = tk.PhotoImage(file=SEPIA_THEME_PREVIEW_PATH)
-            sepia_preview_label = tk.Label(theme_frame, image=sepia_preview, bg=self.config["bg_color"])
-            sepia_preview_label.image = sepia_preview
-            sepia_preview_label.grid(row=1, column=2, padx=10, pady=10, sticky="nsew")
-        except Exception as e:
-            print(f"Erro ao carregar miniatura do tema sepia: {e}")
-
-    def apply_theme(self, theme):
-        """Aplica o tema selecionado."""
-        if theme == "light":
-            self.config["dark_mode"] = "light"
-            self.config["bg_image_path"] = DEFAULT_BG_IMAGE_PATH  # Define o caminho da imagem padrão
-            self.config["bg_color"] = DEFAULT_BG_COLOR
-        elif theme == "dark":
-            self.config["dark_mode"] = "dark"
-            self.config["bg_image_path"] = "ModoNoturno.png"  # Define o caminho da imagem do tema escuro
-            self.config["bg_color"] = DARK_BG_COLOR
-        elif theme == "sepia":
-            self.config["dark_mode"] = "sepia"
-            self.config["bg_image_path"] =  "sepia_background.png"  # Define o caminho da imagem do tema sépia
-            self.config["bg_color"] = SEPIA_BG_COLOR
-
-        # Salva as configurações e atualiza a interface
-        self.config_manager.save_config()
-        self.refresh_gui()
-        self.update_button_styles()
         
     def toggle_sound(self):
         self.config["sound_enabled"] = not self.config["sound_enabled"]
@@ -667,43 +640,42 @@ class SupportApp:
         self.config_manager.save_config()
         self.refresh_gui()
 
-    def toggle_notepad(self):
-        """Alterna a visibilidade do bloco de notas e ajusta a janela."""
-        # 1. Salva geometria atual ANTES de mudar o estado
-        current_geometry = self.root.wm_geometry()
-    
-        if self.config["notepad_expanded"]:
-            self.config["window_size_notepad"] = current_geometry
-        else:
-            self.config["window_size_normal"] = current_geometry
-
-        # 2. Alterna o estado
+    def toggle_notepad(self, no_save=False):
+        """Alterna a visibilidade do bloco de notas."""
+        # Salvar estado anterior
+        prev_state = self.config["notepad_expanded"]
+        
+        # Alterna estado
         self.config["notepad_expanded"] = not self.config["notepad_expanded"]
-    
-        # 3. Aplica nova geometria baseada no novo estado
+        
+        # Ajusta interface
         if self.config["notepad_expanded"]:
-            nova_geometria = self.config["window_size_notepad"]
             self.notepad_frame.pack(fill="both", expand=True)
         else:
-            nova_geometria = self.config["window_size_normal"]
             self.notepad_frame.pack_forget()
-
-        # 4. Força redimensionamento imediato
-        self.root.geometry(nova_geometria)
-        self.root.update_idletasks()
-    
-        # 5. Atualiza menu e salvar configuração
-        self.view_menu.entryconfig(4, label="Ocultar Bloco de Notas" if self.config["notepad_expanded"] else "Exibir Bloco de Notas")
-        self.config_manager.save_config()
+        
+        # Aplica geometria salva
+        new_geometry = self.config[
+            "window_size_notepad" if self.config["notepad_expanded"] else "window_size_normal"
+        ]
+        self.root.geometry(new_geometry)
+        
+        # Atualiza menu
+        self.view_menu.entryconfig(4, 
+            label="Ocultar Bloco de Notas" if self.config["notepad_expanded"] else "Exibir Bloco de Notas"
+        )
+        
+        if not no_save:
+            self.config_manager.save_config()
 
     def show_about(self):
         """Exibe a janela 'Sobre' com informações do aplicativo."""
         about_window = tk.Toplevel(self.root)
         about_window.title("Sobre")
-        about_window.geometry("400x300")  # Aumenta a largura e altura da janela
+        about_window.geometry("400x300")  # largura e altura da janela
 
         # Adiciona informações sobre a versão
-        tk.Label(about_window, text="Versão Suporte 2.9\n").pack(padx=20, pady=(20, 5))
+        tk.Label(about_window, text="Versão Suporte 3.0\n").pack(padx=20, pady=(20, 5))
 
         # Nome do desenvolvedor
         nome_label = tk.Label(about_window, text="Paulo Gama", fg="blue", cursor="hand2")
@@ -810,14 +782,17 @@ class SupportApp:
             if self.is_valid_color(new_bg_color):
                 self.config["bg_color"] = new_bg_color
                 self.config_manager.save_config()
+                self.update_button_styles()  # Adicione esta linha
                 self.refresh_gui()
                 edit_window.destroy()
             else:
                 tk.messagebox.showerror("Erro", "Cor inválida. Por favor, insira um código hexadecimal válido.")
 
-        ttk.Button(button_frame, text="Salvar", command=save_colors).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Cancelar", command=edit_window.destroy).pack(side=tk.LEFT, padx=5)
-
+        ttk.Button(
+            button_frame, 
+            text="Salvar", 
+            command=save_colors
+        ).pack(side=tk.LEFT, padx=5)
 
     def is_valid_color(self, color):
         try:
@@ -828,20 +803,35 @@ class SupportApp:
         except tk.TclError:
             return False
 
+    def get_contrast_color(self, hex_color):
+        """Determina a cor do texto com base no brilho da cor de fundo"""
+        if hex_color.startswith('#'):
+            hex_color = hex_color.lstrip('#')
+        else:
+            return "black"  # Fallback para cores inválidas
+    
+        try:
+            r, g, b = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+            luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+            return "white" if luminance < 0.5 else "black"
+        except:
+            return "black"
+
+    def adjust_color(self, hex_color, delta):
+        """Ajusta o brilho da cor para efeitos de hover/pressed"""
+        hex_color = hex_color.lstrip('#')
+        r = max(0, min(255, int(hex_color[0:2], 16) + delta))
+        g = max(0, min(255, int(hex_color[2:4], 16) + delta))
+        b = max(0, min(255, int(hex_color[4:6], 16) + delta))
+        return f'#{r:02x}{g:02x}{b:02x}'
+
     def create_notepad_widget(self):
         self.notepad_frame = tk.Frame(self.root, bg=self.config["bg_color"])
         self.notepad_frame.pack(fill="both", expand=True)
 
-        # Verifica o tema atual e define as cores do bloco de notas
-        if self.config["dark_mode"] == "dark":
-            notepad_bg_color = "black"
-            notepad_fg_color = "white"
-        elif self.config["dark_mode"] == "sepia":
-            notepad_bg_color = SEPIA_BG_COLOR
-            notepad_fg_color = SEPIA_TEXT_COLOR
-        else:
-            notepad_bg_color = "white"
-            notepad_fg_color = "black"
+        # Usa cores dinâmicas do tema
+        notepad_bg_color = self.config["bg_color"]
+        notepad_fg_color = self.get_contrast_color(notepad_bg_color)
 
         default_font = ("Helvetica", 10)
         self.notepad_text = scrolledtext.ScrolledText(
@@ -851,7 +841,8 @@ class SupportApp:
             wrap=tk.WORD, 
             font=default_font, 
             bg=notepad_bg_color, 
-            fg=notepad_fg_color
+            fg=notepad_fg_color,
+            insertbackground=notepad_fg_color  # Cor do cursor
         )
         self.notepad_text.pack(padx=10, pady=10, fill="both", expand=True)
 
@@ -888,7 +879,7 @@ class SupportApp:
 
         separator_btn = ttk.Button(
             self.notepad_toolbar,
-            text="Adicionar linha", 
+            text="Separação", 
             command=self.add_separator
         )
         separator_btn.pack(side="left", padx=2)
@@ -924,7 +915,6 @@ class SupportApp:
         self.notepad_text.bind("<Control-Z>", self.undo)
         self.notepad_text.bind("<Control-s>", lambda e: self.save_notepad())
         self.notepad_text.bind("<Control-S>", lambda e: self.save_notepad())
-
 
         # Salva o estado após uma pausa na digitação
         self.save_timer = None
@@ -1036,158 +1026,403 @@ class SupportApp:
         self.notepad_manager.save_notepad(content, tags)
 
     def refresh_gui(self):
-        # Captura o conteúdo e as tags do bloco de notas antes de destruir os widgets
-        if hasattr(self, 'notepad_text'):
-            notepad_content = self.notepad_text.get("1.0", tk.END).strip()
-            notepad_tags = self._capture_tags()
-        else:
-            notepad_content = ""
-            notepad_tags = []
+        """Atualiza toda a interface com as novas configurações"""
+        # Captura estado atual
+        current_geometry = self.root.wm_geometry()
+        notepad_expanded = self.config["notepad_expanded"]
+        notepad_content = self.notepad_text.get("1.0", tk.END).strip() if hasattr(self, 'notepad_text') else ""
+        notepad_tags = self._capture_tags() if hasattr(self, 'notepad_text') else []
 
-        # Destruir todos os widgets e recriar a interface
+        # Destrói todos os widgets
         for widget in self.root.winfo_children():
             widget.destroy()
 
+        # Recria interface
         self.setup_ui()
+    
+        # Restaura estado
+        self.root.after(100, lambda: [
+            self.root.wm_geometry(current_geometry),
+           self.config.update({"notepad_expanded": notepad_expanded}),
+            self.toggle_notepad(no_save=True) if notepad_expanded != self.config["notepad_expanded"] else None,
+            self._restore_notepad_content(notepad_content, notepad_tags),
+            self.update_notepad_colors()  # NOVO: Atualizar cores do bloco de notas
+        ])
 
-        # Restaura o conteúdo e as tags após recriar a interface
-        if hasattr(self, 'notepad_text') and notepad_content:
+    def update_notepad_colors(self):
+        """Atualiza dinamicamente as cores do bloco de notas"""
+        if hasattr(self, 'notepad_text'):
+            bg_color = self.config["bg_color"]
+            fg_color = self.get_contrast_color(bg_color)
+        
+            # Aplica novas cores
+            self.notepad_text.configure(
+                bg=bg_color,
+                fg=fg_color,
+                insertbackground=fg_color
+            )
+            self.notepad_frame.configure(bg=bg_color)
+            self.notepad_toolbar.configure(bg=bg_color)
+
+    def _restore_notepad_content(self, content, tags):
+        if hasattr(self, 'notepad_text') and content:
             self.notepad_text.delete("1.0", tk.END)
-            self.notepad_text.insert(tk.END, notepad_content)
-            for tag in notepad_tags:
+            self.notepad_text.insert(tk.END, content)
+            for tag in tags:
                 self.notepad_text.tag_add(tag["tag"], tag["start"], tag["end"])
 
-        # Restaura a geometria correta
-        notepad_state = self.config["notepad_expanded"]
-        if notepad_state:
-            self.root.geometry(self.config["window_size_notepad"])
-        else:
-            self.root.geometry(self.config["window_size_normal"])
-
-        self.root.update_idletasks()
-
-        # Aplica as cores do tema sepia se necessário
-        if self.config["dark_mode"] == "sepia":
-            self.root.configure(bg=SEPIA_BG_COLOR)
-            self.style.configure('TButton', background=SEPIA_BUTTON_BG, foreground=SEPIA_BUTTON_FG)
-            self.style.map('TButton', 
-                background=[('pressed', '#C4A484'), ('active', '#B8860B')],
-                foreground=[('pressed', SEPIA_BUTTON_FG), ('active', SEPIA_BUTTON_FG)]
-            )
-            self.update_button_styles()
-            self.style.configure('TFrame', background=SEPIA_BG_COLOR)
-            self.notepad_text.config(bg=SEPIA_BG_COLOR, fg=SEPIA_TEXT_COLOR)
+    def save_window_size(self, event):
+        """Salva o tamanho atual da janela"""
+        if event.widget == self.root:
+            current_geometry = self.root.wm_geometry()
+            if not current_geometry:
+                return
+            
+            # Verifica se a geometria contém posição
+            if '+' not in current_geometry:
+                # Obtem posição atual se não estiver na string
+                x = self.root.winfo_x()
+                y = self.root.winfo_y()
+                current_geometry += f"+{x}+{y}"
+            
+            if self.config["notepad_expanded"]:
+                self.config["window_size_notepad"] = current_geometry
+            else:
+                self.config["window_size_normal"] = current_geometry
+            
+            self.config_manager.save_config()
 
 
     def update_button_styles(self):
+        """Atualiza o estilo dos botões com base na cor de fundo"""
+        bg_color = self.config["bg_color"]
+        fg_color = self.get_contrast_color(bg_color)
+
+        # Aplica o novo estilo
+        self.style.configure('TButton', 
+            background=bg_color,
+            foreground=fg_color,
+            font=('Helvetica', 9),
+            padding=3
+        )
+    
+        # Atualiza o mapeamento de estados
+        self.style.map('TButton',
+            background=[('pressed', self.adjust_color(bg_color, -30)), 
+                       ('active', self.adjust_color(bg_color, -20))],
+            foreground=[('pressed', fg_color), 
+                       ('active', fg_color)]
+        )
+
+        # Reaplica o estilo a todos os botões
         for widget in self.root.winfo_children():
             if isinstance(widget, ttk.Button):
                 widget.configure(style='TButton')
+
+        # Atualiza cor do cursor do bloco de notas
+        if hasattr(self, 'notepad_text'):
+            fg_color = self.get_contrast_color(self.config["bg_color"])
+            self.notepad_text.configure(insertbackground=fg_color)
 
 class SnakeGame:
     def __init__(self, master):
         self.master = master
         self.master.title("Snake Game")
-        self.master.geometry("400x450")
-        self.canvas = tk.Canvas(self.master, width=400, height=400)
+        self.master.geometry("400x420")
+        
+        # Configuração do canvas principal
+        self.canvas = tk.Canvas(self.master, width=400, height=400, bg='black')
         self.canvas.pack()
+        
+        # Linha de borda entre o canvas e a linha de informações
+        self.border_line = tk.Canvas(self.master, width=400, height=2, bg='white', highlightthickness=0)
+        self.border_line.pack()
+        
+        # Variáveis de estado
         self.snake = [(200, 200), (220, 200), (240, 200)]
         self.direction = "right"
         self.direction_queue = []
         self.apple = self.generate_apple()
         self.score = 0
-        self.game_active = False  # Adicionado para controlar o estado do jogo
-        self.draw_grid()
-        self.draw_snake()
-        self.draw_apple()
-        self.draw_score()
-        self.master.bind("w", self.up)
-        self.master.bind("a", self.left)
-        self.master.bind("s", self.down)
-        self.master.bind("d", self.right)
-        self.start_button = tk.Button(self.master, text="Start", command=self.start_game)
-        self.start_button.pack()
+        self.apples_eaten = 0
+        self.game_active = False
+        self.game_paused = False
+        self.speed = 120  # Velocidade inicial em ms
+        self.powerup_active = None
+        self.powerup_end_time = 0
+        self.active_powerup = None
+        self.powerup_spawn_time = 0
+        self.powerup_cooldown = 15  # Segundos entre powerups
+
+        # Elementos de UI
+        self.score_display = tk.Label(self.master, text="Pontuação: 0 | Velocidade: 100%", 
+                                    bg='black', fg='white', font=('Arial', 10))
+        self.score_display.pack(fill='x', side='bottom')
+        
+        # Botão de início
+        self.start_button = tk.Button(
+            self.master, 
+            text="▶ Iniciar Jogo", 
+            command=self.start_game,
+            bg='#2ecc71', 
+            fg='white', 
+            font=('Arial', 10, 'bold'),
+            relief='flat',
+            padx=10,
+            pady=5
+        )
+        self.start_button.place(relx=0.5, rely=0.9, anchor='center')
+
+        # Bind de teclas
+        self.master.bind("<w>", self.up)
+        self.master.bind("<a>", self.left)
+        self.master.bind("<s>", self.down)
+        self.master.bind("<d>", self.right)
+        self.master.bind("<space>", self.toggle_pause)
+
+        # Adiciona fundo de estrelas
+        self.draw_stars()
+
+    def draw_stars(self):
+        """Desenha estrelas no fundo do canvas."""
+        for _ in range(100):
+            x = random.randint(0, 400)
+            y = random.randint(0, 400)
+            size = random.randint(1, 3)
+            brightness = random.randint(100, 255)
+            self.canvas.create_oval(x, y, x + size, y + size, fill=f'#{brightness:02x}{brightness:02x}{brightness:02x}', outline='')
 
     def generate_apple(self):
-        return (random.randint(0, 380) // 20 * 20, random.randint(0, 380) // 20 * 20)
-
-    def draw_grid(self):
-        for i in range(0, 400, 20):
-            self.canvas.create_line(i, 0, i, 400, fill="#AAAAAA", width=1)
-            self.canvas.create_line(0, i, 400, i, fill="#AAAAAA", width=1)
+        x = random.randint(0, 19) * 20
+        y = random.randint(0, 19) * 20
+        self.planet_color = random.choice([
+            ("#0047AB", "#89CFF0", "#00008B"),
+            ("#964B00", "#D2691E", "#8B4513"),
+            ("#808080", "#A9A9A9", "#696969"),
+            ("#8B0000", "#FF4500", "#8B4513")
+        ])
+        # Gera crateras fixas para esta maçã
+        self.apple_craters = []
+        for _ in range(3):
+            cx = random.randint(x + 2, x + 18)
+            cy = random.randint(y + 2, y + 18)
+            self.apple_craters.append((cx, cy))
+        return (x, y)
 
     def draw_snake(self):
         self.canvas.delete("snake")
+        color = 'yellow' if self.powerup_active == 'invincible' else 'green'
         for x, y in self.snake:
-            self.canvas.create_rectangle(x, y, x + 20, y + 20, fill="green", tag="snake")
+            # Desenha a sombra
+            self.canvas.create_rectangle(x+2, y+2, x + 22, y + 22, fill='#333333', outline='', tag="snake")
+            # Desenha a cobra com textura
+            self.canvas.create_rectangle(x, y, x + 20, y + 20, fill=color, outline='', tag="snake")
+            # Adiciona textura escamada
+            for i in range(0, 20, 5):
+                self.canvas.create_line(x+i, y, x+i, y+20, fill='#228B22', width=1, tag="snake")
+            # Adiciona brilho
+            self.canvas.create_oval(x+5, y+5, x + 15, y + 15, fill='#ADFF2F', outline='', tag="snake")
 
     def draw_apple(self):
         self.canvas.delete("apple")
-        self.canvas.create_oval(self.apple[0], self.apple[1], self.apple[0] + 20, self.apple[1] + 20, fill="red", tag="apple")
+        x, y = self.apple
+        size = 20
+        base, mid, dark = self.planet_color
+        
+        # Desenha a sombra
+        self.canvas.create_oval(x+2, y+2, x + size+2, y + size+2, fill='#333333', outline='', tag="apple")
+        # Desenha os planetas
+        self.canvas.create_oval(x, y, x + size, y + size, fill=base, outline=dark, width=2, tag="apple")
+        self.canvas.create_oval(x+4, y+4, x + size-4, y + size-4, fill=mid, outline="", tag="apple")
+        
+        # Usa as crateras pré-geradas
+        for cx, cy in self.apple_craters:
+            self.canvas.create_oval(cx, cy, cx+4, cy+4, fill=dark, outline="black", width=1, tag="apple")
+        
+        # Adiciona brilho
+        self.canvas.create_oval(x+2, y+2, x + size-2, y + size-2, 
+                              outline="white", width=1, dash=(2,1), tag="apple")
+        self.canvas.create_oval(x+5, y+5, x + size-5, y + size-5, 
+                              outline="#FFD700", width=1, dash=(1,1), tag="apple")
 
-    def draw_score(self):
-        self.canvas.delete("score")
-        self.canvas.create_text(10, 10, text=f"Score: {self.score}", font=("Arial", 12), anchor="nw", tag="score")
+    def update_score_display(self):
+        speed_percent = int((120 / self.speed) * 100)
+        powerup_text = ""
+        if self.powerup_active:
+            if self.powerup_active == 'bonus_points':
+                powerup_text = " | Bônus Coletado!"
+            else:
+                remaining = int(self.powerup_end_time - time.time())
+                powerup_text = f" | {self.powerup_active.capitalize()} ({remaining}s)"
+        
+        self.score_display.config(
+            text=f"Pontuação: {self.score} | Velocidade: {speed_percent}%{powerup_text}"
+        )
 
     def start_game(self):
         self.game_active = True
-        self.start_button.pack_forget()
+        self.game_paused = False
+        self.start_button.place_forget()
+        self.snake = [(200, 200), (220, 200), (240, 200)]
+        self.direction = "right"
+        self.direction_queue = []
+        self.apple = self.generate_apple()
+        self.score = 0
+        self.apples_eaten = 0
+        self.speed = 120
+        self.powerup_active = None
+        self.canvas.delete("all")
+        self.draw_stars()
+        self.draw_snake()
+        self.draw_apple()
+        self.update_score_display()
         self.update()
 
     def update(self):
-        if not self.game_active:  # Se o jogo não estiver ativo, não atualize
+        if not self.game_active or self.game_paused:
             return
+
+        if self.powerup_active and time.time() > self.powerup_end_time:
+            self.deactivate_powerup()
+
+        if (not self.active_powerup and 
+            time.time() - self.powerup_spawn_time > self.powerup_cooldown and
+            random.random() < 0.3):
+            self.spawn_powerup()
 
         if self.direction_queue:
             new_direction = self.direction_queue.pop(0)
-            if new_direction == "up" and self.direction != "down":
-                self.direction = new_direction
-            elif new_direction == "left" and self.direction != "right":
-                self.direction = new_direction
-            elif new_direction == "down" and self.direction != "up":
-                self.direction = new_direction
-            elif new_direction == "right" and self.direction != "left":
+            if (new_direction == "up" and self.direction != "down" or
+                new_direction == "down" and self.direction != "up" or
+                new_direction == "left" and self.direction != "right" or
+                new_direction == "right" and self.direction != "left"):
                 self.direction = new_direction
 
         head = self.snake[-1]
-        if self.direction == "right":
-            new_head = (head[0] + 20, head[1])
-        elif self.direction == "left":
-            new_head = (head[0] - 20, head[1])
-        elif self.direction == "up":
-            new_head = (head[0], head[1] - 20)
-        elif self.direction == "down":
-            new_head = (head[0], head[1] + 20)
+        new_head = {
+            "right": (head[0] + 20, head[1]),
+            "left": (head[0] - 20, head[1]),
+            "up": (head[0], head[1] - 20),
+            "down": (head[0], head[1] + 20)
+        }[self.direction]
 
         self.snake.append(new_head)
+        
         if self.snake[-1] == self.apple:
-            self.score += 1
+            self.apples_eaten += 1
+            self.score += 10
             self.apple = self.generate_apple()
         else:
             self.snake.pop(0)
 
-        if (self.snake[-1][0] < 0 or self.snake[-1][0] >= 400 or
-            self.snake[-1][1] < 0 or self.snake[-1][1] >= 400 or
-            self.snake[-1] in self.snake[:-1]):
-            self.game_active = False  # Para o jogo
-            self.game_over()
-            return  # Sai do método update para evitar chamadas recursivas
+        if not self.powerup_active == 'invincible':
+            if (self.snake[-1][0] < 0 or self.snake[-1][0] >= 400 or
+                self.snake[-1][1] < 0 or self.snake[-1][1] >= 400 or
+                self.snake[-1] in self.snake[:-1]):
+                self.game_over()
+                return
+
+        if self.active_powerup and (new_head[0], new_head[1]) == self.active_powerup['pos']:
+            self.activate_powerup()
 
         self.draw_snake()
         self.draw_apple()
-        self.draw_score()
-        self.master.after(100, self.update)
+        self.update_score_display()
+        self.master.after(self.speed, self.update)
+
+    def spawn_powerup(self):
+        types = [
+            ('invincible', 'gold', 10), 
+            ('speed', 'deep sky blue', 15),
+            ('bonus_points', 'medium orchid', 0)
+        ]
+        power_type, color, duration = random.choice(types)
+        
+        while True:
+            x = random.randint(0, 19) * 20
+            y = random.randint(0, 19) * 20
+            if (x, y) not in self.snake and (x, y) != self.apple:
+                break
+        
+        self.active_powerup = {
+            'type': power_type,
+            'pos': (x, y),
+            'duration': duration,
+            'color': color
+        }
+        self.draw_powerup(x, y)
+        self.powerup_spawn_time = time.time()
+
+    def draw_powerup(self, x, y):
+        self.canvas.delete("powerup")
+        color = self.active_powerup['color']
+        
+        self.canvas.create_oval(
+            x, y, x+20, y+20,
+            fill=color, outline='white', width=2,
+            tags="powerup"
+        )
+        
+        for i in range(1, 4):
+            self.canvas.create_oval(
+                x-i, y-i, x+20+i, y+20+i,
+                outline=color, width=1,
+                tags="powerup"
+            )
+
+    def activate_powerup(self):
+        power_type = self.active_powerup['type']
+        duration = self.active_powerup['duration']
+        
+        self.powerup_active = power_type
+        self.powerup_end_time = time.time() + duration if power_type != 'bonus_points' else 0
+        
+        if power_type == 'speed':
+            self.speed = max(50, self.speed - 30)
+        elif power_type == 'bonus_points':
+            self.score += 150
+            self.powerup_active = None
+            
+        self.canvas.delete("powerup")
+        self.active_powerup = None
+        self.draw_snake()
+        self.update_score_display()
+
+    def deactivate_powerup(self):
+        if self.powerup_active == 'speed':
+            self.speed += 30
+        self.powerup_active = None
+        self.draw_snake()
+        self.update_score_display()
+
+    def toggle_pause(self, event=None):
+        if self.game_active:
+            self.game_paused = not self.game_paused
+            status = "PAUSADO | " if self.game_paused else ""
+            self.score_display.config(text=f"{status}Pontuação: {self.score}")
+            if not self.game_paused: 
+                self.update()
 
     def game_over(self):
+        self.game_active = False
         self.canvas.delete("all")
-        self.canvas.create_text(200, 100, text="Game Over!", font=("Arial", 24), fill="red")
-        self.canvas.create_text(200, 150, text=f"Final Score: {self.score}", font=("Arial", 18))
-    
-        # Verifica se a pontuação está entre os top 3
+        self.canvas.create_text(200, 150, text="Fim de Jogo!", 
+                              font=("Arial", 24), fill="red")
+        self.canvas.create_text(200, 200, 
+                              text=f"Pontuação Final: {self.score}", 
+                              font=("Arial", 16), fill="white")
+
         if self.is_new_high_score():
-            self.request_player_name()  # Chama o método para solicitar o nome
+            self.request_player_name()
         else:
-            self.show_top_scores()  # Mostra os scores sem solicitar o nome
+            self.show_top_scores()
+
+        self.start_button.config(
+            text="🔄 Jogar Novamente",
+            bg='#3498db',
+            command=self.restart_game
+        )
+        self.start_button.place(relx=0.5, rely=0.9, anchor='center')
 
     def is_new_high_score(self):
         try:
@@ -1196,22 +1431,19 @@ class SnakeGame:
         except FileNotFoundError:
             scores = []
 
-        # Verifica se a pontuação do jogador é maior que a menor pontuação no top 3
-        return len(scores) < 3 or self.score > scores[-1]
-
+        return len(scores) < 3 or self.score > (min(scores) if scores else 0)
 
     def request_player_name(self):
-        name = tk.simpledialog.askstring("Nome do Jogador", "Digite seu nome (máx. 6 caracteres):")
-        if name is None or name.strip() == "":
+        name = simpledialog.askstring("Nome do Jogador", "Digite seu nome (máx. 6 caracteres):")
+        if not name or name.strip() == "":
             messagebox.showerror("Erro", "Nome inválido! O score não será salvo.")
-            self.show_top_scores()  # Mostra os scores sem salvar o novo
+            self.show_top_scores()
             return
         if len(name) > 6:
             messagebox.showerror("Erro", "Nome deve ter no máximo 6 caracteres!")
-            self.request_player_name()  # Tenta novamente
+            self.request_player_name()
             return
-        self.save_score(name)  # Salva o score com o nome válido
-        self.show_top_scores()  # Mostra os scores atualizados
+        self.save_score(name)
 
     def save_score(self, name):
         try:
@@ -1220,35 +1452,42 @@ class SnakeGame:
         except FileNotFoundError:
             scores = []
 
-        scores.append((name, str(self.score)))
+        scores.append([name, str(self.score)])
         scores.sort(key=lambda x: int(x[1]), reverse=True)
-        scores = scores[:3]  # Mantém apenas os top 3 scores
+        scores = scores[:3]
 
         with open("scoresnake.dat", "w") as file:
             for entry in scores:
                 file.write(f"{entry[0]},{entry[1]}\n")
+        
+        self.show_top_scores()
 
     def show_top_scores(self):
-        self.canvas.create_text(200, 250, text="Top 3 Scores:", font=("Arial", 18))
+        y_position = 250
+        self.canvas.create_text(200, y_position, text="Top 3 Scores:", 
+                               font=("Arial", 16), fill="white")
+        
         try:
             with open("scoresnake.dat", "r") as file:
                 scores = [line.strip().split(",") for line in file.readlines()]
-            for i, (name, score) in enumerate(scores):
-                self.canvas.create_text(200, 300 + i * 30, text=f"{i + 1}. {name}: {score}", font=("Arial", 18))
+            
+            for i, (name, score) in enumerate(scores[:3]):
+                self.canvas.create_text(200, y_position + 30 + (i * 30),
+                                      text=f"{i+1}. {name}: {score}", 
+                                      font=("Arial", 14), fill="white")
         except FileNotFoundError:
-            self.canvas.create_text(200, 300, text="Nenhum score registrado", font=("Arial", 18))
+            self.canvas.create_text(200, y_position + 30, 
+                                  text="Nenhum recorde registrado", 
+                                  font=("Arial", 14), fill="white")
 
-    def up(self, event):
-        self.direction_queue.append("up")
+    def restart_game(self):
+        self.start_button.place_forget()
+        self.start_game()
 
-    def left(self, event):
-        self.direction_queue.append("left")
-
-    def down(self, event):
-        self.direction_queue.append("down")
-
-    def right(self, event):
-        self.direction_queue.append("right")
+    def up(self, event): self.direction_queue.append("up")
+    def left(self, event): self.direction_queue.append("left")
+    def down(self, event): self.direction_queue.append("down")
+    def right(self, event): self.direction_queue.append("right")
 
 if __name__ == "__main__":
     cleanup_old_temp_dirs()  # Função de limpeza de pasta temporaria MEI na inicialização
