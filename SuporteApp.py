@@ -283,26 +283,90 @@ class TextManager:
     def __init__(self):
         self.texts_path = os.path.join(os.path.dirname(sys.executable), TEXTS_FILE)
         self.texts = self.load_texts()
+        # Dicionário para armazenar as categorias
+        self.categories = self.extract_categories()
 
     def load_texts(self):
         """
         Carrega os textos do arquivo ou retorna uma lista padrão.
         
         Retorna:
-            list: Lista de tuplas (texto, rótulo do botão).
+            list: Lista de tuplas (texto, rótulo do botão, categoria).
         """
         if os.path.exists(self.texts_path):
             try:
                 with open(self.texts_path, "r", encoding="utf-8") as file:
-                    return json.load(file)
+                    data = json.load(file)
+                    # Se for uma lista simples de tuplas [texto, rótulo]
+                    if isinstance(data, list) and len(data) > 0:
+                        # Verifica o formato dos dados
+                        if isinstance(data[0], list):
+                            # Se já tiver 3 elementos, mantém como está
+                            if len(data[0]) == 3:
+                                return data
+                            # Se tiver 2 elementos, adiciona a categoria "Geral"
+                            elif len(data[0]) == 2:
+                                return [(text, label, "Geral") for text, label in data]
             except (json.JSONDecodeError, FileNotFoundError):
-                return [("EXEMPLO", "BOTÃO")]
-        return [("EXEMPLO", "BOTÃO")]
+                pass
+        return [("EXEMPLO", "BOTÃO", "Geral")]
 
     def save_texts(self):
         """Salva os textos atuais no arquivo de configuração, mantendo a formatação UTF-8."""
         with open(self.texts_path, "w", encoding="utf-8") as file:
             json.dump(self.texts, file, ensure_ascii=False, indent=4)
+
+    def extract_categories(self):
+        """Extrai as categorias únicas dos textos carregados."""
+        categories = set()
+        for item in self.texts:
+            # Se o item tiver categoria, usa ela; senão, usa 'Geral'
+            if len(item) >= 3:
+                categories.add(item[2])
+            else:
+                categories.add("Geral")
+        
+        # Garante que 'Geral' sempre exista
+        categories.add("Geral")
+        return sorted(list(categories))
+
+    def add_category(self, category_name):
+        """Adiciona uma nova categoria se ela não existir."""
+        if category_name and category_name not in self.categories:
+            self.categories.append(category_name)
+            self.categories.sort()
+            return True
+        return False
+    
+    def rename_category(self, old_name, new_name):
+        """Renomeia uma categoria e atualiza todos os textos associados."""
+        if old_name in self.categories and new_name and new_name not in self.categories:
+            # Atualiza todos os textos com a categoria antiga
+            for i, item in enumerate(self.texts):
+                if len(item) >= 3 and item[2] == old_name:
+                    self.texts[i] = (item[0], item[1], new_name)
+            
+            # Atualiza a lista de categorias
+            self.categories.remove(old_name)
+            self.categories.append(new_name)
+            self.categories.sort()
+            self.save_texts()
+            return True
+        return False
+    
+    def delete_category(self, category_name):
+        """Deleta uma categoria e move seus textos para 'Geral'."""
+        if category_name in self.categories and category_name != "Geral":
+            # Move todos os textos para a categoria 'Geral'
+            for i, item in enumerate(self.texts):
+                if len(item) >= 3 and item[2] == category_name:
+                    self.texts[i] = (item[0], item[1], "Geral")
+            
+            # Remove a categoria
+            self.categories.remove(category_name)
+            self.save_texts()
+            return True
+        return False
 
 class NotepadManager:
     """
@@ -400,7 +464,7 @@ class SupportApp:
         except Exception as e:
             print(f"Icone não carregado: {e}")
         
-        self.current_version = "3.1"
+        self.current_version = "3.2"
         self.updater = Updater(self.current_version)
         self.check_updates()
 
@@ -412,6 +476,9 @@ class SupportApp:
         # Carrega as configurações
         self.config = self.config_manager.config
         self.texts = self.text_manager.texts
+        
+        # Variável para armazenar a categoria atual
+        self.current_category = "Todas"
 
         # Define a geometria inicial
         initial_size = self.config.get(
@@ -431,6 +498,10 @@ class SupportApp:
 
         # Inicializa pilhas de undo
         self.undo_stack = []
+        self.user_script = ""  # Armazena o script do usuário
+        # Define o arquivo para salvar o script (na mesma pasta do executável)
+        self.script_file = os.path.join(os.path.dirname(sys.executable), "user_script.py")
+        self.load_user_script()
 
     def check_updates(self):
         """
@@ -544,7 +615,19 @@ class SupportApp:
         max_colunas = 8
         bots_por_coluna = 10
 
-        for idx, (text, resumo) in enumerate(self.texts):
+        # Filtra textos por categoria
+        filtered_texts = self.texts
+        if self.current_category != "Todas":
+            filtered_texts = [text for text in self.texts if len(text) >= 3 and text[2] == self.current_category]
+
+        for idx, text_item in enumerate(filtered_texts):
+            # Garante que text_item sempre tenha 3 elementos
+            if len(text_item) == 2:
+                text, resumo = text_item
+                category = "Geral"
+            else:
+                text, resumo, category = text_item
+
             # Calcula coluna e linha conforme sistema anterior
             col = idx // bots_por_coluna  # Cada coluna tem 10 botões
             linha = idx % bots_por_coluna # 0-9
@@ -570,10 +653,14 @@ class SupportApp:
                 height=button_height
             )
             self.button_windows.append(btn_window)
+            
+            # Tooltip mostrando a categoria
+            Tooltip(btn, f"Categoria: {category}")
 
             # Botão de edição
             if self.config["show_edit_buttons"]:
-                edit_btn = ttk.Button(self.canvas, text="✎", width=2, command=lambda i=idx: self.open_edit_window(i))
+                edit_btn = ttk.Button(self.canvas, text="✎", width=2, 
+                                    command=lambda i=self.texts.index(text_item): self.open_edit_window(i))
                 edit_window = self.canvas.create_window(
                     x + button_width + 5,  # Posição ao lado do botão principal
                     y, 
@@ -585,7 +672,7 @@ class SupportApp:
                 self.button_windows.append(edit_window)
 
         # Atualizar scrollregion
-        total_colunas = min(len(self.texts) // bots_por_coluna + 1, max_colunas)
+        total_colunas = min(len(filtered_texts) // bots_por_coluna + 1, max_colunas)
         total_width = start_x + (total_colunas * 185)
         total_height = start_y + (bots_por_coluna * (button_height + padding))
         self.canvas.config(scrollregion=(0, 0, total_width, total_height))
@@ -615,6 +702,34 @@ class SupportApp:
         text_box = scrolledtext.ScrolledText(edit_window, wrap=tk.WORD, width=50, height=15)
         text_box.pack(padx=10, pady=(0, 10))
         text_box.insert(tk.END, self.texts[idx][0])
+        
+        # Campo para selecionar a categoria
+        tk.Label(edit_window, text="Categoria:").pack(padx=10, pady=(10, 0))
+        category_var = tk.StringVar(edit_window)
+        
+        # Obtém a categoria atual do botão ou usa 'Geral' como padrão
+        current_category = self.texts[idx][2] if len(self.texts[idx]) >= 3 else "Geral"
+        category_var.set(current_category)
+        
+        category_dropdown = ttk.Combobox(edit_window, textvariable=category_var, values=self.text_manager.categories)
+        category_dropdown.pack(padx=10, pady=(0, 10))
+        
+        # Botão para criar nova categoria
+        def add_new_category():
+            new_category = simpledialog.askstring("Nova Categoria", "Digite o nome da nova categoria:")
+            if new_category and new_category.strip():
+                if self.text_manager.add_category(new_category.strip()):
+                    # Atualiza o dropdown
+                    category_dropdown['values'] = self.text_manager.categories
+                    category_var.set(new_category.strip())
+                else:
+                    messagebox.showinfo("Info", "Esta categoria já existe.")
+        
+        ttk.Button(
+            edit_window, 
+            text="+ Nova Categoria", 
+            command=add_new_category
+        ).pack(pady=5)
 
         # Frame para os botões de ação
         button_frame = tk.Frame(edit_window)
@@ -624,8 +739,9 @@ class SupportApp:
             new_text = text_box.get("1.0", tk.END).strip()
             new_name = name_entry.get()
             if new_name and new_text:
-                self.texts[idx] = (new_text, new_name)
+                self.texts[idx] = (new_text, new_name, category_var.get())
                 self.text_manager.save_texts()
+                self.update_category_menu()
                 self.refresh_gui()
                 edit_window.destroy()
 
@@ -646,7 +762,7 @@ class SupportApp:
         """Abre janela para adicionar novo botão com campos ampliados"""
         add_window = tk.Toplevel(self.root)
         add_window.title("Adicionar Novo Botão")
-        add_window.geometry("500x400")
+        add_window.geometry("500x450")  # Aumentado para acomodar o dropdown de categoria
 
         # Nome do Botão (Label + Entry)
         tk.Label(add_window, text="Nome do Botão:", font=('Arial', 10, 'bold')).pack(padx=10, pady=(10, 0))
@@ -663,6 +779,31 @@ class SupportApp:
             font=('Arial', 10)
         )
         text_box.pack(padx=10, pady=(0, 10))
+        
+        # Seleção de Categoria
+        tk.Label(add_window, text="Categoria:", font=('Arial', 10, 'bold')).pack(padx=10, pady=(10, 0))
+        category_var = tk.StringVar(add_window)
+        category_var.set("Geral")  # Valor padrão
+        
+        category_dropdown = ttk.Combobox(add_window, textvariable=category_var, values=self.text_manager.categories)
+        category_dropdown.pack(padx=10, pady=(0, 10))
+        
+        # Botão para criar nova categoria
+        def add_new_category():
+            new_category = simpledialog.askstring("Nova Categoria", "Digite o nome da nova categoria:")
+            if new_category and new_category.strip():
+                if self.text_manager.add_category(new_category.strip()):
+                    # Atualiza o dropdown
+                    category_dropdown['values'] = self.text_manager.categories
+                    category_var.set(new_category.strip())
+                else:
+                    messagebox.showinfo("Info", "Esta categoria já existe.")
+        
+        ttk.Button(
+            add_window, 
+            text="+ Nova Categoria", 
+            command=add_new_category
+        ).pack(pady=5)
 
         # Botão de Confirmação
         def confirm_add():
@@ -673,8 +814,10 @@ class SupportApp:
                 messagebox.showerror("Erro", "Ambos os campos são obrigatórios!")
                 return
             
-            self.texts.append((new_text, new_name))
+            # Adiciona o texto com a categoria selecionada
+            self.texts.append((new_text, new_name, category_var.get()))
             self.text_manager.save_texts()
+            self.update_category_menu()
             self.refresh_gui()
             add_window.destroy()
 
@@ -703,6 +846,12 @@ class SupportApp:
             label="Ocultar Bloco de Notas" if self.config["notepad_expanded"] else "Exibir Bloco de Notas",
             command=self.toggle_notepad
         )
+        self.view_menu.add_separator()
+        # Movendo "Novo Botão" para o menu Visual
+        self.view_menu.add_command(
+            label="➕ Novo Botão",
+            command=self.add_new_button
+        )
 
         # Menu "Som"
         self.sound_menu = tk.Menu(menu_bar, tearoff=0)
@@ -712,17 +861,193 @@ class SupportApp:
             command=self.toggle_sound
         )
 
-        # Menu "Ajuda"
+        # Menu "Categorias"
+        self.category_menu = tk.Menu(menu_bar, tearoff=0)
+        menu_bar.add_cascade(label="Categorias", menu=self.category_menu)
+        self.category_menu.add_command(label="Adicionar Categoria", command=self.add_category)
+        self.category_menu.add_command(label="Gerenciar Categorias", command=self.manage_categories)
+        self.category_menu.add_separator()
+        
+        # Sub-menu para selecionar categorias
+        self.update_category_menu()
+        
+        # Adiciona um separador visual no menu (usando cascade vazio com um label de separador)
+        menu_bar.add_cascade(label="│", state="disabled")
+        
+        # Botões de Script diretamente na barra de menu (sem submenu)
+        menu_bar.add_command(label="Script", command=self.execute_script)
+        menu_bar.add_command(label="✎", command=self.edit_script)
+        
+        # Adiciona outro separador visual
+        menu_bar.add_cascade(label="│", state="disabled")
+
+        # Menu "Ajuda" - Movido para o final
         help_menu = tk.Menu(menu_bar, tearoff=0)
         menu_bar.add_cascade(label="Ajuda", menu=help_menu)
         help_menu.add_command(label="Sobre", command=self.show_about)
+
+    def update_category_menu(self):
+        """Atualiza o menu de categorias com as categorias disponíveis."""
+        # Remove itens existentes após o separador
+        items = self.category_menu.index("end")
+        if items > 2:  # Se tiver itens além do separador
+            for i in range(items, 2, -1):
+                self.category_menu.delete(i)
         
-        # Menu "Adicionar botão"
-        menu_bar.add_command(
-            label="➕ Novo Botão",  # Ícone opcional para melhor visualização
-            command=self.add_new_button
+        # Adiciona todas as categorias
+        self.category_menu.add_radiobutton(
+            label="Todas",
+            variable=tk.StringVar(value=self.current_category),
+            value="Todas",
+            command=lambda: self.filter_by_category("Todas")
         )
         
+        # Adiciona cada categoria como radiobutton
+        for category in self.text_manager.categories:
+            self.category_menu.add_radiobutton(
+                label=category,
+                variable=tk.StringVar(value=self.current_category),
+                value=category,
+                command=lambda c=category: self.filter_by_category(c)
+            )
+
+    def filter_by_category(self, category):
+        """Filtra os botões pela categoria selecionada."""
+        self.current_category = category
+        self.refresh_gui()
+
+    def add_category(self):
+        """Abre uma janela para adicionar nova categoria."""
+        new_category = simpledialog.askstring("Nova Categoria", "Digite o nome da nova categoria:")
+        if new_category and new_category.strip():
+            if self.text_manager.add_category(new_category.strip()):
+                self.update_category_menu()
+                messagebox.showinfo("Sucesso", f"Categoria '{new_category}' adicionada com sucesso!")
+            else:
+                messagebox.showinfo("Info", "Esta categoria já existe.")
+
+    def manage_categories(self):
+        """Abre uma janela para gerenciar categorias existentes."""
+        manage_window = tk.Toplevel(self.root)
+        manage_window.title("Gerenciar Categorias")
+        manage_window.geometry("400x300")
+        manage_window.transient(self.root)
+        manage_window.focus_set()
+        
+        # Frame para a lista de categorias
+        frame = tk.Frame(manage_window)
+        frame.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        # Listbox com as categorias
+        tk.Label(frame, text="Categorias:").pack(anchor="w")
+        categories_listbox = tk.Listbox(frame, height=10)
+        categories_listbox.pack(fill="both", expand=True)
+        
+        # Adiciona as categorias à listbox
+        for category in self.text_manager.categories:
+            categories_listbox.insert(tk.END, category)
+        
+        # Frame para os botões
+        button_frame = tk.Frame(frame)
+        button_frame.pack(fill="x", pady=10)
+        
+        # Função para renomear categoria
+        def rename_category():
+            selected_idx = categories_listbox.curselection()
+            if selected_idx:
+                old_name = categories_listbox.get(selected_idx)
+                if old_name == "Geral":
+                    messagebox.showinfo("Info", "Não é possível renomear a categoria 'Geral'.")
+                    return
+                
+                new_name = simpledialog.askstring("Renomear Categoria", 
+                                                 f"Novo nome para '{old_name}':")
+                if new_name and new_name.strip():
+                    if self.text_manager.rename_category(old_name, new_name.strip()):
+                        # Atualiza a listbox
+                        categories_listbox.delete(0, tk.END)
+                        for category in self.text_manager.categories:
+                            categories_listbox.insert(tk.END, category)
+                        
+                        # Atualiza o menu de categorias
+                        self.update_category_menu()
+                        messagebox.showinfo("Sucesso", f"Categoria renomeada para '{new_name}'!")
+                    else:
+                        messagebox.showerror("Erro", "Não foi possível renomear a categoria.")
+        
+        # Função para excluir categoria
+        def delete_category():
+            selected_idx = categories_listbox.curselection()
+            if selected_idx:
+                name = categories_listbox.get(selected_idx)
+                if name == "Geral":
+                    messagebox.showinfo("Info", "Não é possível excluir a categoria 'Geral'.")
+                    return
+                
+                if messagebox.askyesno("Confirmar Exclusão", 
+                                      f"Excluir a categoria '{name}'?\nTodos os textos serão movidos para 'Geral'."):
+                    if self.text_manager.delete_category(name):
+                        # Atualiza a listbox
+                        categories_listbox.delete(0, tk.END)
+                        for category in self.text_manager.categories:
+                            categories_listbox.insert(tk.END, category)
+                        
+                        # Atualiza o menu de categorias
+                        self.update_category_menu()
+                        
+                        # Se a categoria atual for a excluída, muda para 'Todas'
+                        if self.current_category == name:
+                            self.current_category = "Todas"
+                            self.refresh_gui()
+                        
+                        messagebox.showinfo("Sucesso", f"Categoria '{name}' excluída!")
+                    else:
+                        messagebox.showerror("Erro", "Não foi possível excluir a categoria.")
+        
+        # Adiciona os botões
+        ttk.Button(button_frame, text="Renomear", command=rename_category).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Excluir", command=delete_category).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Fechar", command=manage_window.destroy).pack(side=tk.RIGHT, padx=5)
+
+    def execute_script(self):
+        # Executa o script armazenado no self.user_script
+        if self.user_script.strip() == "":
+            messagebox.showinfo("Script vazio", "Nenhum script foi definido.")
+            return
+        try:
+            exec(self.user_script, {})
+        except Exception as e:
+            messagebox.showerror("Erro na Execução", f"Ocorreu um erro: {e}")
+    
+    def edit_script(self):
+        # Abre uma janela Toplevel para editar o script Python
+        editor = tk.Toplevel(self.root)
+        editor.title("Editor de Script Python")
+        editor.geometry("800x600")  # Tamanho maior verticalmente
+        st = scrolledtext.ScrolledText(editor, wrap=tk.WORD, font=("Courier New", 10))
+        st.pack(expand=True, fill="both", padx=10, pady=10)
+        st.insert(tk.END, self.user_script)  # Carrega o script atual
+        btn_frame = tk.Frame(editor)
+        btn_frame.pack(pady=5)
+        
+        def save_script():
+            self.user_script = st.get("1.0", tk.END)
+            self.save_user_script()  # Salva o script no arquivo
+            messagebox.showinfo("Script", "Script salvo com sucesso.")
+        
+        ttk.Button(btn_frame, text="Salvar", command=save_script).pack(side=tk.LEFT, padx=5)
+
+    def load_user_script(self):
+        # Carrega o script se o arquivo existir
+        if os.path.exists(self.script_file):
+            with open(self.script_file, "r", encoding="utf-8") as f:
+                self.user_script = f.read()
+
+    def save_user_script(self):
+        # Salva o conteúdo de user_script no arquivo
+        with open(self.script_file, "w", encoding="utf-8") as f:
+            f.write(self.user_script)
+
     def toggle_sound(self):
         self.config["sound_enabled"] = not self.config["sound_enabled"]
         self.sound_menu.entryconfig(0, label="Desativar Som de Clique" if self.config["sound_enabled"] else "Ativar Som de Clique")
@@ -769,113 +1094,120 @@ class SupportApp:
 
     def show_about(self):
         """
-        Exibe uma janela com informações sobre o aplicativo, incluindo detalhes do desenvolvedor,
-        tecnologias utilizadas e licença.
+        Exibe uma janela com informações sobre o aplicativo, incluindo detalhes do desenvolvedor e licença.
         """
         about_window = tk.Toplevel(self.root)
         about_window.title("Sobre o SuporteApp")
-        about_window.geometry("400x380")
+        about_window.geometry("400x320")  # Altura reduzida já que removemos uma seção
         about_window.resizable(False, False)
+        about_window.configure(bg="#f5f5f7")  # Fundo claro e moderno
+        about_window.grab_set()  # Torna o diálogo modal
 
-        # Configuração do estilo
-        header_font = ("Arial", 14, "bold")
-        section_font = ("Arial", 10, "bold")
-        text_font = ("Arial", 9)
-        link_color = "#0078D4"
-        bg_color = "#F0F0F0"
-        about_window.configure(bg=bg_color)
+        # Frame principal com área de conteúdo
+        main_frame = tk.Frame(about_window, bg="#f5f5f7", padx=25, pady=20)
+        main_frame.pack(fill="both", expand=True)
 
-        # Container principal
-        main_frame = ttk.Frame(about_window)
-        main_frame.pack(padx=20, pady=20, fill="both", expand=True)
-
-        # Cabeçalho
-        header_frame = ttk.Frame(main_frame)
+        # Cabeçalho com título e versão
+        header_frame = tk.Frame(main_frame, bg="#f5f5f7")
         header_frame.pack(fill="x", pady=(0, 15))
 
-        ttk.Label(
+        tk.Label(
             header_frame,
             text="SuporteApp",
-            font=header_font,
-            foreground="#2C3E50",
-            image="",
-            compound="left"
+            font=("Helvetica", 18, "bold"),
+            fg="#2C3E50",
+            bg="#f5f5f7"
         ).pack(side="left")
 
-        ttk.Label(
+        tk.Label(
             header_frame,
-            text=f"Versão {self.current_version}",
-            font=text_font,
-            foreground="#7F8C8D"
-        ).pack(side="right")
+            text=f"v{self.current_version}",
+            font=("Helvetica", 12),
+            fg="#7F8C8D",
+            bg="#f5f5f7"
+        ).pack(side="right", padx=(10, 0), pady=(5, 0))
 
-        # Seção de Informações do Desenvolvedor
-        dev_frame = ttk.LabelFrame(main_frame, text=" Desenvolvedor ", style="TLabelframe")
-        dev_frame.pack(fill="x", pady=5)
+        # Linha separadora
+        separator = tk.Frame(main_frame, height=1, bg="#e0e0e0")
+        separator.pack(fill="x", pady=10)
 
-        info_rows = [
-            ("Nome:", "Paulo Gama", "black"),
-            ("Email:", "DreamerJPMG@gmail.com", link_color),
-            ("GitHub:", "github.com/DreamerJP", link_color),
+        # Container para informações do desenvolvedor
+        dev_container = tk.Frame(main_frame, bg="#f5f5f7")
+        dev_container.pack(fill="x", pady=10)
+
+        # Cria uma grade para informações do desenvolvedor
+        info_data = [
+            ("Desenvolvedor:", "Paulo Gama", "black", None),
+            ("E-mail:", "DreamerJPMG@gmail.com", "#0078D4", "mailto:DreamerJPMG@gmail.com"),
+            ("GitHub:", "github.com/DreamerJP", "#0078D4", "https://github.com/DreamerJP")
         ]
 
-        for label, text, color in info_rows:
-            row = ttk.Frame(dev_frame)
-            row.pack(fill="x", pady=2)
-
-            ttk.Label(
-                row,
+        for row, (label, value, color, link) in enumerate(info_data):
+            tk.Label(
+                dev_container,
                 text=label,
-                font=section_font,
-                width=10,
-                anchor="e"
-            ).pack(side="left", padx=5)
+                font=("Helvetica", 10, "bold"),
+                bg="#f5f5f7",
+                anchor="e",
+                width=13
+            ).grid(row=row, column=0, sticky="e", padx=(0, 10), pady=6)
+            
+            # Para links, cria um label com sublinhado e cursor especial
+            if link:
+                lbl = tk.Label(
+                    dev_container,
+                    text=value,
+                    font=("Helvetica", 10, "underline"),
+                    fg=color,
+                    bg="#f5f5f7",
+                    cursor="hand2"
+                )
+                lbl.grid(row=row, column=1, sticky="w", pady=6)
+                lbl.bind("<Button-1>", lambda e, url=link: self.open_link(url))
+            else:
+                tk.Label(
+                    dev_container,
+                    text=value,
+                    font=("Helvetica", 10),
+                    fg=color,
+                    bg="#f5f5f7"
+                ).grid(row=row, column=1, sticky="w", pady=6)
 
-            lbl = ttk.Label(
-                row,
-                text=text,
-                font=text_font,
-                foreground=color,
-                cursor="hand2" if color == link_color else ""
-            )
-            lbl.pack(side="left", anchor="w")
+        # Segunda linha separadora
+        separator2 = tk.Frame(main_frame, height=1, bg="#e0e0e0")
+        separator2.pack(fill="x", pady=10)
 
-            if color == link_color:
-                lbl.bind("<Button-1>", lambda e, t=text: self.open_link(t))
-
-        # Seção de Tecnologias
-        tech_frame = ttk.LabelFrame(main_frame, text=" Tecnologias Utilizadas ", style="TLabelframe")
-        tech_frame.pack(fill="x", pady=5)
-
-        tech_text = (
-            "• os          • random         • json        • subprocess\n"
-            "• sys        • shutil             • time        • tempfile\n"
-            "• tkinter   • pygame         • requests\n"
-        )
-
-        ttk.Label(
-            tech_frame,
-            text=tech_text,
-            font=text_font,
-            justify="left",
-            anchor="w"  # Alinha o texto à esquerda
-        ).pack(fill="x", padx=10, pady=5)
-
-        # Seção de Licença
-        license_frame = ttk.LabelFrame(main_frame, text=" Licença ", style="TLabelframe")
+        # Seção de licença
+        license_frame = tk.Frame(main_frame, bg="#f5f5f7")
         license_frame.pack(fill="x", pady=5)
 
-        ttk.Label(
+        tk.Label(
             license_frame,
-            text="Distribuído sob Licença Apache-2.0\n"
-                 "© 2025 Todos os direitos reservados",
-            font=text_font,
-            justify="left",
-            anchor="w"  # Alinha o texto à esquerda
-        ).pack(fill="x", padx=10, pady=5)
+            text="Distribuído sob Licença Apache-2.0",
+            font=("Helvetica", 9),
+            fg="#555555",
+            bg="#f5f5f7"
+        ).pack(anchor="w")
 
-        # Easter Egg - Emoji de cobra
-        self.add_snake_emoji_easter_egg(about_window)
+        tk.Label(
+            license_frame,
+            text="© 2025 Todos os direitos reservados",
+            font=("Helvetica", 9),
+            fg="#555555",
+            bg="#f5f5f7"
+        ).pack(anchor="w")
+
+        # Easter Egg - Emoji de cobra (canto inferior direito)
+        snake_label = tk.Label(
+            about_window,
+            text="🐍",
+            font=("Segoe UI Emoji", 16),
+            bg="#f5f5f7",
+            fg="#2a702a",
+            cursor="hand2"
+        )
+        snake_label.place(relx=0.95, rely=0.95, anchor="se")
+        snake_label.bind("<Button-1>", lambda e: self.start_snake_game(about_window))
 
     def open_link(self, text):
         """Abre links externos no navegador padrão"""
@@ -1271,13 +1603,6 @@ class SupportApp:
             self.notepad_frame.configure(bg=bg_color)
             self.notepad_toolbar.configure(bg=bg_color)
 
-    def _restore_notepad_content(self, content, tags):
-        if hasattr(self, 'notepad_text') and content:
-            self.notepad_text.delete("1.0", tk.END)
-            self.notepad_text.insert(tk.END, content)
-            for tag in tags:
-                self.notepad_text.tag_add(tag["tag"], tag["start"], tag["end"])
-
     def update_button_styles(self):
         """Atualiza o estilo dos botões com base na cor de fundo"""
         bg_color = self.config["bg_color"]
@@ -1322,8 +1647,20 @@ class SnakeGame:
         self.master.geometry("400x440")
         self.master.configure(bg='black')
 
-        self.canvas = tk.Canvas(master, width=400, height=420, bg='#0a0a2a', highlightthickness=0)
-        self.canvas.pack()
+        # Definições de tamanho do jogo
+        self.game_width = 400
+        self.game_height = 400  # Alterado para garantir divisibilidade por 20 (tamanho da célula)
+        self.cell_size = 20
+
+        # Criar o canvas exatamente com o tamanho do campo de jogo, sem espaçamento adicional
+        self.canvas = tk.Canvas(
+            master, 
+            width=self.game_width, 
+            height=self.game_height, 
+            bg='#0a0a2a', 
+            highlightthickness=0
+        )
+        self.canvas.pack(fill="both", expand=False)  # Removido expand=True para manter tamanho fixo
 
         # Variáveis de estado do jogo
         self.snake = [(200, 200), (220, 200), (240, 200)]
@@ -1341,10 +1678,15 @@ class SnakeGame:
         self.powerup_spawn_time = 0
         self.powerup_cooldown = 15  # Segundos entre powerups
 
-        # Elementos de UI
-        self.score_display = tk.Label(self.master, text="Pontuação: 0 | Velocidade: 100%", 
-                                    bg='black', fg='white', font=('Arial', 10))
-        self.score_display.pack(fill='x', side='bottom')
+        # Elementos de UI 
+        self.score_display = tk.Label(
+            self.master, 
+            text="Pontuação: 0 | Velocidade: 100%", 
+            bg='black', 
+            fg='white', 
+            font=('Arial', 10)
+        )
+        self.score_display.pack(fill='x', side='bottom', pady=0)
 
         # Bind de teclas
         self.master.bind("<w>", self.up)
@@ -1473,18 +1815,42 @@ class SnakeGame:
         self.update_score_display()
         self.update()
 
-    """Desenha estrelas no fundo do canvas."""
     def draw_stars(self):
-        for _ in range(100):
+        """Desenha estrelas no fundo do canvas com efeito de profundidade."""
+        for _ in range(150):  # Aumentado o número de estrelas
             x = random.randint(0, 400)
             y = random.randint(0, 400)
             size = random.randint(1, 3)
+            # Criar estrelas com diferentes níveis de brilho para dar sensação de profundidade
             brightness = random.randint(100, 255)
-            self.canvas.create_oval(x, y, x + size, y + size, fill=f'#{brightness:02x}{brightness:02x}{brightness:02x}', outline='')
+            # Estrelas menores ficam mais escuras para simular distância
+            if size == 1:
+                brightness = random.randint(100, 180)
+            elif size == 3:
+                brightness = random.randint(200, 255)
+            
+            # Adicionar pequeno brilho ao redor das estrelas maiores
+            if size >= 2 and random.random() > 0.7:
+                glow_size = size + random.randint(1, 3)
+                # Corrigido: Usar int() para converter valores divididos por float para inteiro
+                glow_brightness = int(brightness // 2)  # Metade do brilho para o brilho
+                self.canvas.create_oval(
+                    x - glow_size//2, y - glow_size//2, 
+                    x + size + glow_size//2, y + size + glow_size//2, 
+                    fill='', outline=f'#{glow_brightness:02x}{glow_brightness:02x}{glow_brightness:02x}', 
+                    width=1
+                )
+            
+            self.canvas.create_oval(
+                x, y, x + size, y + size, 
+                fill=f'#{brightness:02x}{brightness:02x}{brightness:02x}', 
+                outline=''
+            )
 
     def generate_apple(self):
-        x = random.randint(0, 19) * 20
-        y = random.randint(0, 19) * 20
+        # Usa as variáveis de dimensão para garantir que a maçã apareça dentro dos limites corretos
+        x = random.randint(0, (self.game_width // self.cell_size) - 1) * self.cell_size
+        y = random.randint(0, (self.game_height // self.cell_size) - 1) * self.cell_size
         self.planet_color = random.choice([
             ("#0047AB", "#89CFF0", "#00008B"),
             ("#964B00", "#D2691E", "#8B4513"),
@@ -1501,39 +1867,161 @@ class SnakeGame:
 
     def draw_snake(self):
         self.canvas.delete("snake")
-        color = 'yellow' if self.powerup_active == 'invincible' else 'green'
-        for x, y in self.snake:
-            # Desenha a sombra
-            self.canvas.create_rectangle(x+2, y+2, x + 22, y + 22, fill='#333333', outline='', tag="snake")
-            # Desenha a cobra com textura
-            self.canvas.create_rectangle(x, y, x + 20, y + 20, fill=color, outline='', tag="snake")
-            # Adiciona textura escamada
-            for i in range(0, 20, 5):
-                self.canvas.create_line(x+i, y, x+i, y+20, fill='#228B22', width=1, tag="snake")
-            # Adiciona brilho
-            self.canvas.create_oval(x+5, y+5, x + 15, y + 15, fill='#ADFF2F', outline='', tag="snake")
+        
+        # Cor base da cobra depende do powerup ativo
+        if self.powerup_active == 'invincible':
+            base_color = '#FFD700'  # Dourado para invencibilidade
+            glow_color = '#FFFFA0'  # Brilho amarelo claro
+            shadow_color = '#B8860B'  # Sombra dourada escura
+        else:
+            base_color = '#00CC00'  # Verde vivo
+            glow_color = '#80FF80'  # Brilho verde claro
+            shadow_color = '#006600'  # Sombra verde escura
+        
+        # Desenha cada segmento da cobra
+        for i, (x, y) in enumerate(self.snake):
+            # Cria um efeito de sombra projetada para profundidade
+            offset = 3
+            self.canvas.create_rectangle(
+                x+offset, y+offset, x+20+offset, y+20+offset, 
+                fill='#222222', outline='', 
+                tag="snake"
+            )
+            
+            # Desenha o segmento principal com gradiente simulado
+            self.canvas.create_rectangle(
+                x, y, x+20, y+20, 
+                fill=base_color, outline=shadow_color, width=1, 
+                tag="snake"
+            )
+            
+            # Se for a cabeça da cobra (último elemento)
+            if i == len(self.snake) - 1:
+                # Olhos da cobra
+                eye_offset = 5
+                # Determina a posição dos olhos baseado na direção
+                if self.direction == "right":
+                    eyes = [(x+15, y+5), (x+15, y+15)]
+                elif self.direction == "left":
+                    eyes = [(x+5, y+5), (x+5, y+15)]
+                elif self.direction == "up":
+                    eyes = [(x+5, y+5), (x+15, y+5)]
+                else:  # down
+                    eyes = [(x+5, y+15), (x+15, y+15)]
+                
+                # Desenha os olhos
+                for ex, ey in eyes:
+                    # Contorno preto do olho
+                    self.canvas.create_oval(
+                        ex-3, ey-3, ex+3, ey+3,
+                        fill='white', outline='black', width=1,
+                        tag="snake"
+                    )
+                    # Pupila
+                    self.canvas.create_oval(
+                        ex-1, ey-1, ex+1, ey+1,
+                        fill='black', outline='',
+                        tag="snake"
+                    )
+            
+            # Reflexo superior-esquerdo (efeito de luz)
+            if i < len(self.snake) - 1 or self.direction in ["down", "right"]:
+                self.canvas.create_polygon(
+                    x, y, x+6, y, x, y+6,
+                    fill=glow_color, outline='', 
+                    tag="snake"
+                )
+            
+            # Padrão de escamas na cobra (linhas horizontais e verticais)
+            if i % 2 == 0:  # Alterna o padrão das escamas
+                for j in range(4):
+                    self.canvas.create_line(
+                        x+5*j, y, x+5*j, y+20,
+                        fill=shadow_color, width=1,
+                        tag="snake"
+                    )
+            else:
+                for j in range(4):
+                    self.canvas.create_line(
+                        x, y+5*j, x+20, y+5*j,
+                        fill=shadow_color, width=1,
+                        tag="snake"
+                    )
+                    
+            # Adiciona um detalhe de brilho se for invencível
+            if self.powerup_active == 'invincible' and random.random() > 0.7:
+                sparkle_x = x + random.randint(5, 15)
+                sparkle_y = y + random.randint(5, 15)
+                self.canvas.create_text(
+                    sparkle_x, sparkle_y,
+                    text="✦", fill="white", font=('Arial', 8),
+                    tag="snake"
+                )
 
     def draw_apple(self):
         self.canvas.delete("apple")
         x, y = self.apple
         size = 20
         base, mid, dark = self.planet_color
-
-        # Desenha a sombra
-        self.canvas.create_oval(x+2, y+2, x + size+2, y + size+2, fill='#333333', outline='', tag="apple")
-        # Desenha os planetas
-        self.canvas.create_oval(x, y, x + size, y + size, fill=base, outline=dark, width=2, tag="apple")
-        self.canvas.create_oval(x+4, y+4, x + size-4, y + size-4, fill=mid, outline="", tag="apple")
         
-        # Usa as crateras pré-geradas
+        # Desenha sombra mais suave com degradê
+        for i in range(4, 0, -1):
+            alpha = 40 + i*40  # Transparência simulada com tons de cinza
+            shadow_color = f'#{alpha:02x}{alpha:02x}{alpha:02x}'
+            offset = i + 2
+            self.canvas.create_oval(
+                x+offset, y+offset, x+size+offset-i, y+size+offset-i, 
+                fill=shadow_color, outline='', 
+                tag="apple"
+            )
+        
+        # Base do planeta (círculo principal)
+        self.canvas.create_oval(
+            x, y, x+size, y+size, 
+            fill=base, outline=dark, width=2, 
+            tag="apple"
+        )
+        
+        # Superfície do planeta (variação de cor)
+        self.canvas.create_oval(
+            x+4, y+4, x+size-4, y+size-4, 
+            fill=mid, outline="", 
+            tag="apple"
+        )
+        
+        # Crateras com efeito de profundidade
         for cx, cy in self.apple_craters:
-            self.canvas.create_oval(cx, cy, cx+4, cy+4, fill=dark, outline="black", width=1, tag="apple")
+            crater_size = random.randint(3, 5)
+            # Sombra da cratera
+            self.canvas.create_oval(
+                cx+1, cy+1, cx+crater_size+1, cy+crater_size+1, 
+                fill='black', outline='', width=0,
+                tag="apple"
+            )
+            # Cratera
+            self.canvas.create_oval(
+                cx, cy, cx+crater_size, cy+crater_size, 
+                fill=dark, outline='black', width=1,
+                tag="apple"
+            )
         
-        # Adiciona brilho
-        self.canvas.create_oval(x+2, y+2, x + size-2, y + size-2, 
-                              outline="white", width=1, dash=(2,1), tag="apple")
-        self.canvas.create_oval(x+5, y+5, x + size-5, y + size-5, 
-                              outline="#FFD700", width=1, dash=(1,1), tag="apple")
+        # Reflexo de luz na parte superior (brilho)
+        highlight_arc = self.canvas.create_arc(
+            x+3, y+3, x+size-3, y+size-3,
+            start=20, extent=60,
+            style=tk.ARC,
+            outline='white', width=2,
+            tag="apple"
+        )
+        
+        # Brilho adicional cintilante
+        light_x = x + random.randint(4, 8)
+        light_y = y + random.randint(4, 8)
+        self.canvas.create_oval(
+            light_x, light_y, light_x+3, light_y+3,
+            fill='white', outline='',
+            tag="apple"
+        )
 
     def update_score_display(self):
         speed_percent = int((120 / self.speed) * 100)
@@ -1571,11 +2059,27 @@ class SnakeGame:
 
         head = self.snake[-1]
         new_head = {
-            "right": (head[0] + 20, head[1]),
-            "left": (head[0] - 20, head[1]),
-            "up": (head[0], head[1] - 20),
-            "down": (head[0], head[1] + 20)
+            "right": (head[0] + self.cell_size, head[1]),
+            "left": (head[0] - self.cell_size, head[1]),
+            "up": (head[0], head[1] - self.cell_size),
+            "down": (head[0], head[1] + self.cell_size)
         }[self.direction]
+        
+        # Implementação do "wrap around" no modo invencível
+        if self.powerup_active == 'invincible':
+            x, y = new_head
+            # Ajusta a posição se ultrapassar as bordas usando as variáveis de dimensão
+            if x < 0:
+                x = self.game_width - self.cell_size
+            elif x >= self.game_width:
+                x = 0
+            
+            if y < 0:
+                y = self.game_height - self.cell_size
+            elif y >= self.game_height:
+                y = 0
+                
+            new_head = (x, y)
 
         self.snake.append(new_head)
         
@@ -1586,18 +2090,55 @@ class SnakeGame:
         else:
             self.snake.pop(0)
 
+        # Verificação de colisão - modificada para o modo invencível
         if not self.powerup_active == 'invincible':
-            if (self.snake[-1][0] < 0 or self.snake[-1][0] >= 400 or
-                self.snake[-1][1] < 0 or self.snake[-1][1] >= 400 or
+            # No modo normal, qualquer colisão causa game over
+            # Usa as variáveis de dimensão para verificar os limites
+            if (self.snake[-1][0] < 0 or self.snake[-1][0] >= self.game_width or
+                self.snake[-1][1] < 0 or self.snake[-1][1] >= self.game_height or
                 self.snake[-1] in self.snake[:-1]):
                 self.game_over()
                 return
+        # Modo invencível - não há verificação de colisão (removida a verificação com o corpo)
 
         if self.active_powerup and (new_head[0], new_head[1]) == self.active_powerup['pos']:
             self.activate_powerup()
 
         self.draw_snake()
         self.draw_apple()
+        
+        # Desenha o powerup ativo se existir
+        if self.active_powerup:
+            x, y = self.active_powerup['pos']
+            self.draw_powerup(x, y)
+        
+        # Se tiver powerup ativo, adicionar efeitos visuais
+        if self.powerup_active == 'invincible' and random.random() > 0.8:
+            # Adiciona um rastro de partículas para invencibilidade
+            x, y = self.snake[-1]
+            sparkle_x = x + random.randint(-5, 25)
+            sparkle_y = y + random.randint(-5, 25)
+            sparkle = self.canvas.create_text(
+                sparkle_x, sparkle_y,
+                text="✦", fill="#FFD700", font=('Arial', 8),
+                tags="effect"
+            )
+            # Remove o efeito após um tempo
+            self.master.after(300, lambda s=sparkle: self.canvas.delete(s))
+            
+        elif self.powerup_active == 'speed' and random.random() > 0.8:
+            # Adiciona um rastro de velocidade
+            if len(self.snake) >= 2:
+                x, y = self.snake[-2]  # Posição anterior da cabeça
+                trail = self.canvas.create_oval(
+                    x+5, y+5, x+15, y+15,
+                    fill="#87CEFA", outline="",
+                    tags="effect"
+                )
+                # Desaparece gradualmente
+                self.master.after(100, lambda t=trail: self.canvas.itemconfig(t, fill="#ADD8E6"))
+                self.master.after(200, lambda t=trail: self.canvas.delete(t))
+        
         self.update_score_display()
         self.master.after(self.speed, self.update)
 
@@ -1609,9 +2150,10 @@ class SnakeGame:
         ]
         power_type, color, duration = random.choice(types)
         
+        # Usa as variáveis de dimensão para o posicionamento
         while True:
-            x = random.randint(0, 19) * 20
-            y = random.randint(0, 19) * 20
+            x = random.randint(0, (self.game_width // self.cell_size) - 1) * self.cell_size
+            y = random.randint(0, (self.game_height // self.cell_size) - 1) * self.cell_size
             if (x, y) not in self.snake and (x, y) != self.apple:
                 break
         
@@ -1626,20 +2168,60 @@ class SnakeGame:
 
     def draw_powerup(self, x, y):
         self.canvas.delete("powerup")
+        power_type = self.active_powerup['type']
         color = self.active_powerup['color']
         
+        # Sombra do powerup
+        for i in range(3, 0, -1):
+            shadow_opacity = 60 + i*30
+            shadow_color = f'#{shadow_opacity:02x}{shadow_opacity:02x}{shadow_opacity:02x}'
+            offset = i+1
+            self.canvas.create_oval(
+                x+offset, y+offset, x+20+offset-i, y+20+offset-i,
+                fill=shadow_color, outline='',
+                tags="powerup"
+            )
+        
+        # Base do powerup
         self.canvas.create_oval(
             x, y, x+20, y+20,
             fill=color, outline='white', width=2,
             tags="powerup"
         )
         
+        # Adiciona efeito brilhante ao redor
         for i in range(1, 4):
+            glow_alpha = 120 - i*30
+            glow_color = color if i == 1 else f'#{glow_alpha:02x}{glow_alpha:02x}{glow_alpha:02x}'
+            
             self.canvas.create_oval(
-                x-i, y-i, x+20+i, y+20+i,
-                outline=color, width=1,
+                x-i*2, y-i*2, x+20+i*2, y+20+i*2,
+                outline=glow_color, width=1, dash=(i*2, i),
                 tags="powerup"
             )
+        
+        # Adiciona um símbolo diferente para cada tipo de powerup
+        symbol = "⚡"  # padrão
+        if power_type == 'invincible':
+            symbol = "★"
+        elif power_type == 'speed':
+            symbol = "⚡"
+        elif power_type == 'bonus_points':
+            symbol = "✱"
+        
+        self.canvas.create_text(
+            x+10, y+10, text=symbol,
+            fill='white', font=('Arial', 12, 'bold'),
+            tags="powerup"
+        )
+        
+        # Reflexo de luz (efeito 3D)
+        self.canvas.create_arc(
+            x+5, y+5, x+15, y+15,
+            start=20, extent=60, style=tk.ARC,
+            outline='white', width=2,
+            tags="powerup"
+        )
 
     def activate_powerup(self):
         power_type = self.active_powerup['type']
@@ -1677,27 +2259,66 @@ class SnakeGame:
     def game_over(self):
         self.game_active = False
         self.canvas.delete("all")
-        self.canvas.create_text(200, 150, text="Fim de Jogo!", 
-                              font=("Arial", 24), fill="red")
+        
+        # Fundo mais detalhado para a tela de fim de jogo
+        self.draw_stars()
+        
+        # Adiciona um overlay semi-transparente - ajustado para as dimensões do jogo
+        self.canvas.create_rectangle(
+            0, 0, self.game_width, self.game_height,
+            fill='#000000', stipple='gray50'
+        )
+        
+        # Título de fim de jogo com efeito de profundidade
+        for i in range(3, 0, -1):
+            offset = i*2
+            # Corrigido: Usar cálculos de inteiros apenas
+            red_value = 100 - i*30
+            color = f'#{red_value:02x}0000'  # Tons de vermelho
+            self.canvas.create_text(200+offset, 150+offset, 
+                                  text="Fim de Jogo!", 
+                                  font=("Arial Black", 24), 
+                                  fill=color)
+        
+        self.canvas.create_text(200, 150, 
+                              text="Fim de Jogo!", 
+                              font=("Arial Black", 24, 'bold'), 
+                              fill="#FF3333")
+        
+        # Pontuação com efeito de sombra
+        self.canvas.create_text(202, 202, 
+                              text=f"Pontuação Final: {self.score}", 
+                              font=("Arial", 16), 
+                              fill="#333333")
         self.canvas.create_text(200, 200, 
                               text=f"Pontuação Final: {self.score}", 
-                              font=("Arial", 16), fill="white")
+                              font=("Arial", 16), 
+                              fill="white")
 
         if self.is_new_high_score():
+            # Destaque para novo recorde
+            self.canvas.create_text(200, 230, 
+                                  text="NOVO RECORDE!", 
+                                  font=("Arial", 14, "bold"), 
+                                  fill="#FFD700")
             self.request_player_name()
         else:
             self.show_top_scores()
 
+        # Botão de reinício com estilo 3D
         self.start_button = tk.Button(
             self.master, 
             text="🔄 Jogar Novamente", 
             command=self.restart_game,
-            bg='#3498db', 
+            bg='#1E88E5', 
             fg='white', 
-            font=('Arial', 10, 'bold'),
-            relief='flat',
-            padx=10,
-            pady=5
+            font=('Arial', 12, 'bold'),
+            relief='raised',
+            borderwidth=3,
+            padx=15,
+            pady=8,
+            activebackground='#0D47A1',
+            activeforeground='white'
         )
         self.start_button.place(relx=0.5, rely=0.9, anchor='center')
 
