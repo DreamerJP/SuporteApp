@@ -1,3 +1,8 @@
+"""
+SuporteApp - Um aplicativo de suporte com interface gráfica para copiar textos, editar configurações e iniciar um jogo Snake.
+Contém funcionalidades para atualização automática, gerenciamento de configurações e notas.
+"""
+
 import os
 import sys
 import tkinter as tk
@@ -10,9 +15,10 @@ import tempfile
 import requests
 import time
 import shutil
+import traceback
 
 def get_resource_path(relative_path):
-    """Obtém caminho correto para recursos tanto em desenvolvimento quanto no executável"""
+    """Obtém o caminho absoluto para um recurso, considerando se está em modo desenvolvimento ou executável."""
     if getattr(sys, 'frozen', False):
         base_path = sys._MEIPASS
     else:
@@ -29,7 +35,7 @@ TEXTS_FILE = "texts.json"
 NOTEPAD_FILE = "notepad.json"
 
 def handle_rmtree_error(func, path, exc_info):
-    """Manipulador de erros para shutil.rmtree."""
+    """Manipulador de erros para shutil.rmtree: ajusta permissões para permitir a exclusão."""
     import stat
     if not os.access(path, os.W_OK):
         os.chmod(path, stat.S_IWUSR)
@@ -40,7 +46,7 @@ def handle_rmtree_error(func, path, exc_info):
 def cleanup_old_temp_dirs():
     """
     Limpa diretórios temporários antigos (_MEI*) no diretório do executável.
-    Executa automaticamente no início do programa.
+    Essa função é executada no início do programa para evitar acúmulo de pastas temporárias.
     """
     try:
         if not getattr(sys, 'frozen', False):
@@ -64,11 +70,24 @@ def cleanup_old_temp_dirs():
         print(f"[CLEANUP] Erro crítico durante a limpeza: {str(main_error)}")
 
 class Updater:
+    """
+    Gerencia a verificação e atualização do aplicativo.
+    
+    Atributos:
+        current_version (str): Versão atual do aplicativo.
+        version_url (str): URL para verificação de uma nova versão.
+    """
     def __init__(self, current_version):
         self.current_version = current_version
         self.version_url = "https://raw.githubusercontent.com/DreamerJP/SuporteApp/main/version.json"
 
     def check_for_updates(self):
+        """
+        Verifica se há uma nova versão consultando a URL definida.
+        
+        Retorna:
+            dict ou None: Informações da nova versão, se disponível.
+        """
         try:
             response = requests.get(self.version_url)
             response.raise_for_status()
@@ -81,6 +100,12 @@ class Updater:
             return None
 
     def download_and_install(self, download_url):
+        """
+        Faz o download do novo executável, cria e valida o script BAT para substituição e reinicia o aplicativo.
+        
+        Parâmetros:
+            download_url (str): URL para download do novo executável.
+        """
         try:
             current_exe = sys.executable
             print(f"[DEBUG] Caminho atual: {current_exe}")
@@ -111,7 +136,16 @@ class Updater:
             messagebox.showerror("Erro de Atualização", f"Detalhes: {str(e)}")
 
     def generate_bat_script(self, old_exe, new_exe):
-        """Gera o conteúdo do BAT com caminhos embutidos"""
+        """
+        Gera o conteúdo do script BAT necessário para atualizar o executável.
+        
+        Parâmetros:
+            old_exe (str): Caminho do executável atual.
+            new_exe (str): Caminho do novo executável baixado.
+            
+        Retorna:
+            str: Conteúdo do script BAT.
+        """
         old_exe = os.path.normpath(os.path.abspath(old_exe))
         new_exe = os.path.normpath(os.path.abspath(new_exe))
         return f"""@@echo off
@@ -170,7 +204,17 @@ exit /b 0
 """
 
     def write_and_validate_bat(self, content, old_exe, new_exe):
-        """Escreve o arquivo BAT e verifica a integridade"""
+        """
+        Escreve o arquivo BAT com codificação UTF-8 com BOM e valida se os caminhos estão corretos.
+        
+        Parâmetros:
+            content (str): Conteúdo do script BAT.
+            old_exe (str): Caminho do executável atual.
+            new_exe (str): Caminho do novo executável.
+            
+        Retorna:
+            str: Caminho completo do script BAT escrito.
+        """
         old_exe = os.path.normpath(os.path.abspath(old_exe))
         new_exe = os.path.normpath(os.path.abspath(new_exe))
         bat_path = os.path.join(tempfile.gettempdir(), "update_script.bat")
@@ -188,7 +232,11 @@ exit /b 0
         return bat_path
 
 class ConfigManager:
-    """Gerencia o carregamento e salvamento das configurações do aplicativo."""
+    """
+    Gerencia o carregamento e salvamento das configurações do aplicativo.
+    
+    As configurações incluem caminhos de arquivos, temas e tamanhos de janelas.
+    """
     def __init__(self):
         self.config_path = os.path.join(os.path.dirname(sys.executable), CONFIG_FILE)
         self.default_config = {
@@ -205,7 +253,12 @@ class ConfigManager:
         self.config = self.load_config()
 
     def load_config(self):
-        """Carrega as configurações do arquivo ou retorna as configurações padrão."""
+        """
+        Carrega as configurações a partir do arquivo de configuração ou retorna as configurações padrão.
+        
+        Retorna:
+            dict: Configurações carregadas.
+        """
         if os.path.exists(self.config_path):
             try:
                 with open(self.config_path, "r") as file:
@@ -219,18 +272,25 @@ class ConfigManager:
         return self.default_config
 
     def save_config(self):
-        """Salva as configurações no arquivo."""
+        """Salva as configurações atuais no arquivo de configuração."""
         with open(self.config_path, "w") as file:
             json.dump(self.config, file)
 
 class TextManager:
-    """Gerencia o carregamento e salvamento dos textos."""
+    """
+    Gerencia o carregamento e salvamento dos textos que serão copiados pelos botões.
+    """
     def __init__(self):
         self.texts_path = os.path.join(os.path.dirname(sys.executable), TEXTS_FILE)
         self.texts = self.load_texts()
 
     def load_texts(self):
-        """Carrega os textos do arquivo ou retorna uma lista padrão."""
+        """
+        Carrega os textos do arquivo ou retorna uma lista padrão.
+        
+        Retorna:
+            list: Lista de tuplas (texto, rótulo do botão).
+        """
         if os.path.exists(self.texts_path):
             try:
                 with open(self.texts_path, "r", encoding="utf-8") as file:
@@ -240,17 +300,24 @@ class TextManager:
         return [("EXEMPLO", "BOTÃO")]
 
     def save_texts(self):
-        """Salva os textos no arquivo."""
+        """Salva os textos atuais no arquivo de configuração, mantendo a formatação UTF-8."""
         with open(self.texts_path, "w", encoding="utf-8") as file:
             json.dump(self.texts, file, ensure_ascii=False, indent=4)
 
 class NotepadManager:
-    """Gerencia o bloco de notas."""
+    """
+    Gerencia o conteúdo do bloco de notas, permitindo salvar e carregar textos e suas formatações.
+    """
     def __init__(self):
         self.notepad_path = os.path.join(os.path.dirname(sys.executable), NOTEPAD_FILE)
 
     def load_notepad(self):
-        """Carrega o conteúdo do bloco de notas."""
+        """
+        Carrega o conteúdo do bloco de notas, retornando o texto e as formatações (tags).
+        
+        Retorna:
+            tuple: (texto, lista de tags) ou ("", []) se não for possível carregar.
+        """
         if os.path.exists(self.notepad_path):
             try:
                 with open(self.notepad_path, "r", encoding="utf-8") as file:
@@ -261,14 +328,24 @@ class NotepadManager:
         return "", []
 
     def save_notepad(self, content, tags):
-        """Salva o conteúdo no bloco de notas."""
+        """
+        Salva o conteúdo e as tags (formatações) no arquivo referente ao bloco de notas.
+        
+        Parâmetros:
+            content (str): Conteúdo do bloco de notas.
+            tags (list): Lista de tags aplicadas ao texto.
+        """
         data = {
             "text": content,
             "tags": tags
         }
         with open(self.notepad_path, "w", encoding="utf-8") as file:
             json.dump(data, file, ensure_ascii=False, indent=4)
+
 class Tooltip:
+    """
+    Exibe pequenos textos de apoio (tooltips) para widgets, com um delay configurável.
+    """
     def __init__(self, widget, text):
         self.widget = widget
         self.text = text
@@ -279,11 +356,11 @@ class Tooltip:
         self.widget.bind("<Leave>", self.hidetip)
 
     def showtip(self, event=None):
-        "Exibe o tooltip com pequeno delay"
+        """Agenda a exibição do tooltip com um pequeno delay."""
         self.id = self.widget.after(100, self.display_tip)
 
     def display_tip(self):
-        "Cria e exibe a janela do tooltip"
+        """Cria e exibe a janela do tooltip próximo ao widget."""
         if self.tip_window or not self.text:
             return
         x, y, _, _ = self.widget.bbox("insert")
@@ -300,7 +377,7 @@ class Tooltip:
         label.pack()
 
     def hidetip(self, event=None):
-        "Remove o tooltip"
+        """Remove o tooltip da tela e limpa o timer."""
         if self.tip_window:
             self.tip_window.destroy()
         self.tip_window = None
@@ -309,6 +386,9 @@ class Tooltip:
             self.id = None
 
 class SupportApp:
+    """
+    Gerencia a interface principal do SuporteApp, incluindo a criação de botões, menus, bloco de notas e integração com o jogo Snake.
+    """
     def __init__(self, root):
         self.root = root
         self.root.title("SuporteApp")
@@ -320,7 +400,7 @@ class SupportApp:
         except Exception as e:
             print(f"Icone não carregado: {e}")
         
-        self.current_version = "3.0"
+        self.current_version = "3.1"
         self.updater = Updater(self.current_version)
         self.check_updates()
 
@@ -353,12 +433,18 @@ class SupportApp:
         self.undo_stack = []
 
     def check_updates(self):
+        """
+        Verifica e notifica sobre atualizações disponíveis chamando o Updater.
+        """
         version_info = self.updater.check_for_updates()
         if version_info:
             if messagebox.askyesno("Atualização Disponível", f"Uma nova versão ({version_info['version']}) está disponível. Deseja atualizar agora?"):
                 self.updater.download_and_install(version_info["download_url"])
 
     def load_sound(self):
+        """
+        Inicializa o som para clique dos botões (usando pygame) e trata falhas de carregamento.
+        """
         try:
             self.click_sound = pygame.mixer.Sound("click.wav")
         except Exception as e:
@@ -367,6 +453,7 @@ class SupportApp:
             self.sound_menu.entryconfig(0, label="Erro - Som Desativado")
 
     def setup_ui(self):
+        """Configura a interface gráfica (UI), criando canvas, botões, menus e blocos de notas."""
         self.root.configure(bg=self.config["bg_color"])
         self.create_canvas()
         self.load_bg_image()
@@ -379,16 +466,23 @@ class SupportApp:
         self.update_button_styles()
 
     def save_window_size(self, event):
-            """Salva o tamanho atual da janela no estado correto."""
-            if event.widget == self.root:
-                current_geometry = self.root.wm_geometry()
-        
-                if self.config["notepad_expanded"]:
-                    self.config["window_size_notepad"] = current_geometry
-                else:
-                    self.config["window_size_normal"] = current_geometry
-        
-                self.config_manager.save_config()
+        """
+        Salva o tamanho atual da janela, incluindo a posição.
+        Se a geometria não incluir a posição, adiciona a partir de winfo_x/y.
+        """
+        if event.widget == self.root:
+            current_geometry = self.root.wm_geometry()
+            if not current_geometry:
+                return
+            if '+' not in current_geometry:
+                x = self.root.winfo_x()
+                y = self.root.winfo_y()
+                current_geometry += f"+{x}+{y}"
+            if self.config["notepad_expanded"]:
+                self.config["window_size_notepad"] = current_geometry
+            else:
+                self.config["window_size_normal"] = current_geometry
+            self.config_manager.save_config()
 
     def create_canvas(self):
         self.canvas = tk.Canvas(self.root, bg=self.config["bg_color"])
@@ -641,7 +735,12 @@ class SupportApp:
         self.refresh_gui()
 
     def toggle_notepad(self, no_save=False):
-        """Alterna a visibilidade do bloco de notas."""
+        """
+        Alterna a visibilidade do bloco de notas e ajusta a geometria da janela.
+        
+        Parâmetros:
+            no_save (bool): Se True, não salva o estado atual nas configurações.
+        """
         # Salvar estado anterior
         prev_state = self.config["notepad_expanded"]
         
@@ -669,33 +768,141 @@ class SupportApp:
             self.config_manager.save_config()
 
     def show_about(self):
-        """Exibe a janela 'Sobre' com informações do aplicativo."""
+        """
+        Exibe uma janela com informações sobre o aplicativo, incluindo detalhes do desenvolvedor,
+        tecnologias utilizadas e licença.
+        """
         about_window = tk.Toplevel(self.root)
-        about_window.title("Sobre")
-        about_window.geometry("400x300")  # largura e altura da janela
+        about_window.title("Sobre o SuporteApp")
+        about_window.geometry("400x380")
+        about_window.resizable(False, False)
 
-        # Adiciona informações sobre a versão
-        tk.Label(about_window, text="Versão Suporte 3.0\n").pack(padx=20, pady=(20, 5))
+        # Configuração do estilo
+        header_font = ("Arial", 14, "bold")
+        section_font = ("Arial", 10, "bold")
+        text_font = ("Arial", 9)
+        link_color = "#0078D4"
+        bg_color = "#F0F0F0"
+        about_window.configure(bg=bg_color)
 
-        # Nome do desenvolvedor
-        nome_label = tk.Label(about_window, text="Paulo Gama", fg="blue", cursor="hand2")
-        nome_label.pack(padx=20, pady=(5, 5))
-        nome_label.bind("<1>", lambda event: self.start_snake_game(about_window))
+        # Container principal
+        main_frame = ttk.Frame(about_window)
+        main_frame.pack(padx=20, pady=20, fill="both", expand=True)
 
-        # Email do desenvolvedor
-        email_label = tk.Label(about_window, text="DreamerJPMG@gmail.com", fg="green", cursor="hand2")
-        email_label.pack(padx=20, pady=(5, 10))
-        email_label.bind("<1>", lambda event: self.copy_to_clipboard("DreamerJPMG@gmail.com"))
+        # Cabeçalho
+        header_frame = ttk.Frame(main_frame)
+        header_frame.pack(fill="x", pady=(0, 15))
 
-        # Adiciona informações sobre as tecnologias utilizadas
-        tk.Label(about_window, text="Tecnologias utilizadas:").pack(padx=20, pady=(5, 5))
+        ttk.Label(
+            header_frame,
+            text="SuporteApp",
+            font=header_font,
+            foreground="#2C3E50",
+            image="",
+            compound="left"
+        ).pack(side="left")
 
-        # Texto com quebra automática
-        tecnologias = "Python, Tkinter, Pygame, JSON, Requests, Subprocess, Tempfile, Random, Time, OS, Sys, TTK (Themed Tkinter), ScrolledText, Messagebox, Filedialog, Simpledialog, shutil."
-        tk.Label(about_window, text=tecnologias, wraplength=350, justify="left").pack(padx=20, pady=(5, 10))
-        
-        # Informações sobre o desenvolvimento
-        tk.Label(about_window, text="Desenvolvido como um projeto pessoal.").pack(padx=20, pady=(5, 5))
+        ttk.Label(
+            header_frame,
+            text=f"Versão {self.current_version}",
+            font=text_font,
+            foreground="#7F8C8D"
+        ).pack(side="right")
+
+        # Seção de Informações do Desenvolvedor
+        dev_frame = ttk.LabelFrame(main_frame, text=" Desenvolvedor ", style="TLabelframe")
+        dev_frame.pack(fill="x", pady=5)
+
+        info_rows = [
+            ("Nome:", "Paulo Gama", "black"),
+            ("Email:", "DreamerJPMG@gmail.com", link_color),
+            ("GitHub:", "github.com/DreamerJP", link_color),
+        ]
+
+        for label, text, color in info_rows:
+            row = ttk.Frame(dev_frame)
+            row.pack(fill="x", pady=2)
+
+            ttk.Label(
+                row,
+                text=label,
+                font=section_font,
+                width=10,
+                anchor="e"
+            ).pack(side="left", padx=5)
+
+            lbl = ttk.Label(
+                row,
+                text=text,
+                font=text_font,
+                foreground=color,
+                cursor="hand2" if color == link_color else ""
+            )
+            lbl.pack(side="left", anchor="w")
+
+            if color == link_color:
+                lbl.bind("<Button-1>", lambda e, t=text: self.open_link(t))
+
+        # Seção de Tecnologias
+        tech_frame = ttk.LabelFrame(main_frame, text=" Tecnologias Utilizadas ", style="TLabelframe")
+        tech_frame.pack(fill="x", pady=5)
+
+        tech_text = (
+            "• os          • random         • json        • subprocess\n"
+            "• sys        • shutil             • time        • tempfile\n"
+            "• tkinter   • pygame         • requests\n"
+        )
+
+        ttk.Label(
+            tech_frame,
+            text=tech_text,
+            font=text_font,
+            justify="left",
+            anchor="w"  # Alinha o texto à esquerda
+        ).pack(fill="x", padx=10, pady=5)
+
+        # Seção de Licença
+        license_frame = ttk.LabelFrame(main_frame, text=" Licença ", style="TLabelframe")
+        license_frame.pack(fill="x", pady=5)
+
+        ttk.Label(
+            license_frame,
+            text="Distribuído sob Licença Apache-2.0\n"
+                 "© 2025 Todos os direitos reservados",
+            font=text_font,
+            justify="left",
+            anchor="w"  # Alinha o texto à esquerda
+        ).pack(fill="x", padx=10, pady=5)
+
+        # Easter Egg - Emoji de cobra
+        self.add_snake_emoji_easter_egg(about_window)
+
+    def open_link(self, text):
+        """Abre links externos no navegador padrão"""
+        links = {
+            "DreamerJPMG@gmail.com": "mailto:DreamerJPMG@gmail.com",
+            "github.com/DreamerJP": "https://github.com/DreamerJP"
+        }
+        url = links.get(text, "")
+        if url:
+            import webbrowser
+            webbrowser.open_new(url)
+
+    def add_snake_emoji_easter_egg(self, window):
+        """Adiciona o emoji de cobra como Easter Egg"""
+        snake_frame = tk.Frame(window, bg="#F0F0F0")
+        snake_frame.place(relx=1.0, rely=1.0, anchor="se")
+
+        snake_label = tk.Label(
+            snake_frame,
+            text="🐍",
+            font=("Arial", 16),
+            bg="#F0F0F0",
+            fg="#2a702a",
+            cursor="hand2"
+        )
+        snake_label.pack(padx=0, pady=0)  # Remover padding
+        snake_label.bind("<Button-1>", lambda e: self.start_snake_game(window))
 
     def start_snake_game(self, about_window):
         about_window.destroy()  # Fecha a janela "Sobre"
@@ -1071,28 +1278,6 @@ class SupportApp:
             for tag in tags:
                 self.notepad_text.tag_add(tag["tag"], tag["start"], tag["end"])
 
-    def save_window_size(self, event):
-        """Salva o tamanho atual da janela"""
-        if event.widget == self.root:
-            current_geometry = self.root.wm_geometry()
-            if not current_geometry:
-                return
-            
-            # Verifica se a geometria contém posição
-            if '+' not in current_geometry:
-                # Obtem posição atual se não estiver na string
-                x = self.root.winfo_x()
-                y = self.root.winfo_y()
-                current_geometry += f"+{x}+{y}"
-            
-            if self.config["notepad_expanded"]:
-                self.config["window_size_notepad"] = current_geometry
-            else:
-                self.config["window_size_normal"] = current_geometry
-            
-            self.config_manager.save_config()
-
-
     def update_button_styles(self):
         """Atualiza o estilo dos botões com base na cor de fundo"""
         bg_color = self.config["bg_color"]
@@ -1125,20 +1310,22 @@ class SupportApp:
             self.notepad_text.configure(insertbackground=fg_color)
 
 class SnakeGame:
+    """
+    Implementa o jogo Snake dentro de uma janela tkinter.
+    
+    Responsável pela criação da tela de título, controle do jogo, movimento da cobra,
+    geração e desenho de maçãs e powerups, e gerenciamento dos scores.
+    """
     def __init__(self, master):
         self.master = master
-        self.master.title("Snake Game")
-        self.master.geometry("400x420")
-        
-        # Configuração do canvas principal
-        self.canvas = tk.Canvas(self.master, width=400, height=400, bg='black')
+        self.master.title("Space Snake")
+        self.master.geometry("400x440")
+        self.master.configure(bg='black')
+
+        self.canvas = tk.Canvas(master, width=400, height=420, bg='#0a0a2a', highlightthickness=0)
         self.canvas.pack()
-        
-        # Linha de borda entre o canvas e a linha de informações
-        self.border_line = tk.Canvas(self.master, width=400, height=2, bg='white', highlightthickness=0)
-        self.border_line.pack()
-        
-        # Variáveis de estado
+
+        # Variáveis de estado do jogo
         self.snake = [(200, 200), (220, 200), (240, 200)]
         self.direction = "right"
         self.direction_queue = []
@@ -1158,20 +1345,6 @@ class SnakeGame:
         self.score_display = tk.Label(self.master, text="Pontuação: 0 | Velocidade: 100%", 
                                     bg='black', fg='white', font=('Arial', 10))
         self.score_display.pack(fill='x', side='bottom')
-        
-        # Botão de início
-        self.start_button = tk.Button(
-            self.master, 
-            text="▶ Iniciar Jogo", 
-            command=self.start_game,
-            bg='#2ecc71', 
-            fg='white', 
-            font=('Arial', 10, 'bold'),
-            relief='flat',
-            padx=10,
-            pady=5
-        )
-        self.start_button.place(relx=0.5, rely=0.9, anchor='center')
 
         # Bind de teclas
         self.master.bind("<w>", self.up)
@@ -1180,11 +1353,128 @@ class SnakeGame:
         self.master.bind("<d>", self.right)
         self.master.bind("<space>", self.toggle_pause)
 
-        # Adiciona fundo de estrelas
-        self.draw_stars()
+        # Exibe a tela de título
+        self.show_title_screen()
 
+    def show_title_screen(self):
+        """
+        Exibe a tela de título com estrelas animadas, título e botão para iniciar o jogo.
+        """
+        self.create_stars()
+        self.draw_title()
+        self.create_button()
+        self.animate_stars()
+
+    def create_stars(self):
+        """Cria e posiciona estrelas para a tela de título e armazena suas propriedades para animação."""
+        self.stars = []
+        for _ in range(100):
+            while True:
+                x = random.randint(0, 400)
+                y = random.randint(0, 420)
+                if not (100 <= y <= 150 and 150 <= x <= 250) and not (300 <= y <= 350 and 150 <= x <= 250):
+                    break
+            
+            size = random.choice([1,1,1,2,2,3])
+            star = self.canvas.create_oval(
+                x, y, x+size, y+size,
+                fill=self.get_star_color(),
+                outline=''
+            )
+            self.stars.append({
+                'id': star,
+                'timer': random.randint(10, 40),
+                'base_brightness': random.choice([50, 100, 150])
+            })
+            self.canvas.lower(star)
+
+    def get_star_color(self, brightness=None):
+        brightness = brightness or random.choice([50, 100, 150])
+        return f'#{brightness:02x}{brightness:02x}{brightness:02x}'
+
+    def animate_stars(self):
+        """Atualiza dinamicamente o brilho das estrelas para efeito de animação."""
+        if not self.canvas.winfo_exists():
+            return
+
+        for star in self.stars:
+            star['timer'] -= 1
+            
+            if star['timer'] <= 0:
+                new_brightness = star['base_brightness'] + random.randint(-20, 30)
+                new_brightness = max(30, min(new_brightness, 180))
+                
+                self.canvas.itemconfig(star['id'], fill=self.get_star_color(new_brightness))
+                star['timer'] = random.randint(15, 25)
+        
+        self.master.after(100, self.animate_stars)
+
+    def draw_title(self):
+        """Desenha o título 'SPACE SNAKE' com camadas de cor para um efeito de sombra."""
+        text = "SPACE SNAKE"
+        layers = [
+            {'offset': (2, 2), 'color': '#002200'},
+            {'offset': (1, 1), 'color': '#004400'},
+            {'offset': (0, 0), 'color': '#00ff00'}
+        ]
+        
+        for layer in layers:
+            self.canvas.create_text(
+                200 + layer['offset'][0], 
+                125 + layer['offset'][1],
+                text=text,
+                font=('Arial Black', 36, 'bold'),
+                fill=layer['color'],
+                anchor='center'
+            )
+
+    def create_button(self):
+        """Cria o botão de 'INICIAR JOGO' e associa os eventos de mouse para interação."""
+        self.btn_bg = self.canvas.create_rectangle(
+            130, 300, 270, 350,
+            fill='#001100',
+            outline='#00ff00',
+            width=2
+        )
+        self.btn_text = self.canvas.create_text(
+            200, 325,
+            text="INICIAR JOGO",
+            font=('Arial', 14, 'bold'),
+            fill='#00ff00',
+            anchor='center'
+        )
+        
+        self.canvas.tag_raise(self.btn_bg)
+        self.canvas.tag_raise(self.btn_text)
+
+        self.canvas.tag_bind(self.btn_bg, '<Enter>', lambda e: self.canvas.itemconfig(self.btn_bg, fill='#002200'))
+        self.canvas.tag_bind(self.btn_bg, '<Leave>', lambda e: self.canvas.itemconfig(self.btn_bg, fill='#001100'))
+        self.canvas.tag_bind(self.btn_bg, '<Button-1>', self.start_game)
+        self.canvas.tag_bind(self.btn_text, '<Button-1>', self.start_game)
+
+    def start_game(self, event=None):
+        """
+        Inicia o jogo, reiniciando variáveis de controle, redesenhando canvas e começando o loop principal.
+        """
+        self.canvas.delete("all")
+        self.game_active = True
+        self.game_paused = False
+        self.snake = [(200, 200), (220, 200), (240, 200)]
+        self.direction = "right"
+        self.direction_queue = []
+        self.apple = self.generate_apple()
+        self.score = 0
+        self.apples_eaten = 0
+        self.speed = 120
+        self.powerup_active = None
+        self.draw_stars()
+        self.draw_snake()
+        self.draw_apple()
+        self.update_score_display()
+        self.update()
+
+    """Desenha estrelas no fundo do canvas."""
     def draw_stars(self):
-        """Desenha estrelas no fundo do canvas."""
         for _ in range(100):
             x = random.randint(0, 400)
             y = random.randint(0, 400)
@@ -1201,7 +1491,7 @@ class SnakeGame:
             ("#808080", "#A9A9A9", "#696969"),
             ("#8B0000", "#FF4500", "#8B4513")
         ])
-        # Gera crateras fixas para esta maçã
+        # Gera crateras fixas para os planetas
         self.apple_craters = []
         for _ in range(3):
             cx = random.randint(x + 2, x + 18)
@@ -1228,7 +1518,7 @@ class SnakeGame:
         x, y = self.apple
         size = 20
         base, mid, dark = self.planet_color
-        
+
         # Desenha a sombra
         self.canvas.create_oval(x+2, y+2, x + size+2, y + size+2, fill='#333333', outline='', tag="apple")
         # Desenha os planetas
@@ -1258,25 +1548,6 @@ class SnakeGame:
         self.score_display.config(
             text=f"Pontuação: {self.score} | Velocidade: {speed_percent}%{powerup_text}"
         )
-
-    def start_game(self):
-        self.game_active = True
-        self.game_paused = False
-        self.start_button.place_forget()
-        self.snake = [(200, 200), (220, 200), (240, 200)]
-        self.direction = "right"
-        self.direction_queue = []
-        self.apple = self.generate_apple()
-        self.score = 0
-        self.apples_eaten = 0
-        self.speed = 120
-        self.powerup_active = None
-        self.canvas.delete("all")
-        self.draw_stars()
-        self.draw_snake()
-        self.draw_apple()
-        self.update_score_display()
-        self.update()
 
     def update(self):
         if not self.game_active or self.game_paused:
@@ -1417,10 +1688,16 @@ class SnakeGame:
         else:
             self.show_top_scores()
 
-        self.start_button.config(
-            text="🔄 Jogar Novamente",
-            bg='#3498db',
-            command=self.restart_game
+        self.start_button = tk.Button(
+            self.master, 
+            text="🔄 Jogar Novamente", 
+            command=self.restart_game,
+            bg='#3498db', 
+            fg='white', 
+            font=('Arial', 10, 'bold'),
+            relief='flat',
+            padx=10,
+            pady=5
         )
         self.start_button.place(relx=0.5, rely=0.9, anchor='center')
 
