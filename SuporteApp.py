@@ -762,7 +762,7 @@ class SupportApp:
         """Abre janela para adicionar novo botão com campos ampliados"""
         add_window = tk.Toplevel(self.root)
         add_window.title("Adicionar Novo Botão")
-        add_window.geometry("500x450")  # Aumentado para acomodar o dropdown de categoria
+        add_window.geometry("500x550") 
 
         # Nome do Botão (Label + Entry)
         tk.Label(add_window, text="Nome do Botão:", font=('Arial', 10, 'bold')).pack(padx=10, pady=(10, 0))
@@ -1085,7 +1085,7 @@ class SupportApp:
         self.root.geometry(new_geometry)
         
         # Atualiza menu
-        self.view_menu.entryconfig(4, 
+        self.view_menu.entryconfig(3, 
             label="Ocultar Bloco de Notas" if self.config["notepad_expanded"] else "Exibir Bloco de Notas"
         )
         
