@@ -1,0 +1,7 @@
+Release Note 3.4
+
+Execução de Scripts Isolada e Paralela
+Agora, ao executar scripts Python pelo botão "Script", o código é rodado em um novo processo, separado do SuporteApp, sem abrir janela de CMD.
+O script do usuário é executado em paralelo, permitindo que o SuporteApp continue funcionando normalmente enquanto o script roda.
+O usuário não precisa esperar o script terminar para usar o programa.
+Requer Python instalado no sistema.

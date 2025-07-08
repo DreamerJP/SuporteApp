@@ -6,7 +6,7 @@ Comando para criar executável:
 pyinstaller --onefile --noconsole --icon="ico.ico" --add-data "ico.ico;." --version-file=version_info.txt --runtime-tmpdir=. SuporteApp.py
 
 
-<h1>Versão 3.3:</h1>
+<h1>Versão 3.4:</h1>
 
 ![SuporteApp3.2](https://github.com/user-attachments/assets/b34a941f-8dbc-4a78-a90a-aa022cc72425)
 

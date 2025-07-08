@@ -10,7 +10,7 @@
         "Inicio atendimento"
     ],
     [
-        "Entendi. 👍 \nUm momento por favor que estou verificando a conexão. \nEla poderá cair por alguns segundos, mas já retornará.",
+        "Entendi.\nUm momento por favor que estou verificando.\nDurante a verificação a conexão poderá cair por alguns segundos.",
         "Verificando conexão",
         "Inicio atendimento"
     ],
@@ -45,7 +45,7 @@
         "Inicio atendimento"
     ],
     [
-        "Havendo mais alguma dúvida ou problema com a conexão, por favor entre em contato novamente.\nTenha um ótimo dia! 😀",
+        "Havendo algo mais para auxiliarmos, por favor entre em contato novamente.\nTenha um ótimo dia! 😀",
         "Encerrar Atendimento",
         "Fim atendimento"
     ],
@@ -70,12 +70,12 @@
         "Fim atendimento"
     ],
     [
-        "Reservamos o direito de acesso às configurações do roteador aos nossos técnicos, a fim de garantir que as configurações estejam de acordo para o funcionamento da internet.\nPossibilitamos alterar configurações remotamente pelo atendimento, caso necessite de alguma função específica, como o redirecionamento de portas por exemplo.\n\nSe fizer questão de receber os dados de acesso posso fornecer, porém informo que em caso que essas configurações sofram alterações e resultem na falta de internet/necessidade de uma visita técnica para reconfiguração e reparo, a visita poderá ter o custo do chamado técnico.\nGostaria de alguma informação ou ajuste especifico das configurações do roteador, ou prefere receber os dados de acesso do mesmo?",
+        "Reservamos o acesso do roteador aos nossos técnicos, para garantir que tudo esteja correto para o bom funcionamento da sua internet.\nPossibilitamos alterar configurações remotamente pelo atendimento, caso necessite de alguma função específica, como o redirecionamento de portas, troca de senha, etc.\n\nSe fizer questão de receber os dados de acesso posso fornecer, porém caso seja feita alguma alteração, que acabe fazendo a internet deixar de funcionar, a visita de reparo poderá ter o custo do chamado técnico.\nGostaria de algum ajuste ou informação específica das configurações do roteador, ou prefere receber os dados de acesso do mesmo?",
         "Sobre senha roteador",
         "Inicio atendimento"
     ],
     [
-        "Há alguns requisitos para realização do teste de velocidade.\nComo a velocidade da banda contratada é muito alta, celulares, ou dispositivos conectados na rede Wi-Fi não costumam ser fortes o suficiente para atingir a velocidade máxima, e o teste fica limitado a capacidade do dispositivo/tecnologia WiFi.\n\nRecomendamos para teste um computador conectado via cabo de rede.\nO computador e o cabo tem que suportar conexão gigabit (superior a 100mega).\nRecomendamos também os sites speedtest.net / fast.com / nperf.com\nOutros sites por possuir muita propaganda acabam interferindo no resultado, ou não tendo servidores próximos disponíveis. \n\nCaso não tenha um computador via cabo de rede disponível o teste pode ser realizado via Wi-Fi, porém cada rede Wi-Fi e dispositivo possuem capacidade diferente.\nPor exemplo dispositivos conectados na rede Wi-Fi 2.4Ghz costumam atingir a velocidade máxima de 40 a 50mega.\nJá na rede Wi-Fi 5Ghz pode chegar a média de 250mega.\nTambém há a variação de intensidade de sinal, e numero de dispositivos conectados, que pode interferir no resultado.\n\nLembrando que isso é apenas para realização dos testes de velocidade.\nCaso tenha alguma outra dúvida/problema sobre a conexão podemos verificar também!",
+        "Há alguns requisitos para realização do teste de velocidade.\nComo a velocidade da banda contratada é muito alta, celulares, ou dispositivos conectados na rede Wi-Fi não costumam ser fortes o suficiente para atingir a velocidade máxima, e o teste fica limitado a capacidade do dispositivo/tecnologia WiFi.\n\nRecomendamos para teste um computador conectado via cabo de rede.\nO computador e o cabo tem que suportar conexão gigabit (superior a 100mega).\nRecomendamos também os sites speedtest.net / fast.com / nperf.com\n\nCaso não tenha um computador via cabo de rede disponível o teste pode ser realizado via Wi-Fi, porém cada rede Wi-Fi e dispositivo possuem capacidade diferente.\nPor exemplo dispositivos conectados na rede Wi-Fi 2.4Ghz costumam atingir a velocidade máxima de 40 a 50mega.\nJá na rede Wi-Fi 5Ghz pode chegar a média de 250mega.\nTambém há a variação de intensidade de sinal, e numero de dispositivos conectados, que pode interferir no resultado.\n\nLembrando que isso é apenas para realização dos testes de velocidade.\nCaso tenha alguma outra dúvida/problema sobre a conexão podemos verificar também!",
         "Teste de velocidade",
         "Geral"
     ],
@@ -85,7 +85,7 @@
         "Fim atendimento"
     ],
     [
-        "CANAIS WI-FI, DNS, BANDA WI-FI, AUTO. SINAL FIBRA DENTRO DO PADRÃO. IPV6 E UPNP ATIVOS. REINICIADO EQUIPAMENTOS E ORIENTADO A TESTAR. CLIENTE CONFIRMA MELHORA.",
+        "Ajustado canais WI-FI para livrar de interferências, Checado DNS, Banda WI-FI em auto, IPV6 ativo.\nSinal da fibra dentro do padrão de qualidade.\nReiniciados equipamentos e orientado cliente a testar. Cliente confirma melhora na conexão.",
         "Finalizar O.S.",
         "Fim atendimento"
     ],
@@ -103,5 +103,20 @@
         "Bom dia! 😀\nDesculpe não ter respondido ainda ontem, meu turno de atendimento já havia se encerrado.",
         "Resposta de manha.",
         "Inicio atendimento"
+    ],
+    [
+        "Pronto, a senha foi alterada! 👍😀\nAjudo em algo mais neste momento?",
+        "Senha alterada",
+        "Fim atendimento"
+    ],
+    [
+        "Para trocar os equipamentos de cômodo precisamos refazer parte da instalação.\nEste é um serviço extra e tem um custo de R$50,00 referente ao chamado.\nCaso o cabeamento da fibra não alcance o novo local, será necessário refazer a instalação toda por completo, trocando o cabeamento da fibra, assim o valor total fica em R$100,00.\n\nTenho vaga mais próxima disponível para sexta-feira no período da tarde.\nGostaria de agendar a visita?",
+        "Troca de comodo",
+        "Geral"
+    ],
+    [
+        "Nesse momento há (    )   dispositivos conectados todos na mesma rede Wi-Fi 2.4Ghz.\nO ideal quando são muitos dispositivos, é separar entre as conexões disponíveis do roteador, para nenhuma rede ficar sobrecarregada.\nO roteado conta com 3 métodos de conexão:\n\n1 - Via cabo, mais indicado para TV's, computadores, ou dispositivos fixo.\n2 - Rede Wi-Fi 2.4Ghz, indicado para celulares que constantemente vão para os cômodos mais distantes.\n3 - Rede Wi-Fi 5Ghz, indicado para celulares próximos ao roteador. \n\nOferecemos cabo de rede de até 1 metro gratuitamente aqui na loja, e vendemos cabos maiores (necessário reservar).\nAlém disso temos disponível o serviço de passagem de cabo de rede de um cômodo para outro (Por ser um serviço extra há um custo).",
+        "WiFi sobrecarregado",
+        "Geral"
     ]
 ]
