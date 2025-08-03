@@ -499,7 +499,7 @@ class SupportApp:
         except Exception as e:
             print(f"Icone não carregado: {e}")
 
-        self.current_version = "3.4"
+        self.current_version = "3.5"
         self.updater = Updater(self.current_version)
         self.check_updates()
 
@@ -532,6 +532,9 @@ class SupportApp:
 
         # Initialize button_windows
         self.button_windows = []
+        # Drag-and-drop mode for reordering buttons
+        self.drag_mode = False
+        self._drag_data = {"widget": None, "start_idx": None, "drag_window": None}
 
         self.setup_ui()
         pygame.mixer.init()
@@ -682,7 +685,6 @@ class SupportApp:
         for btn in self.button_windows:
             self.canvas.delete(btn)
         self.button_windows = []
-
         # Configurações de posicionamento
         start_x, start_y = 10, 10
         button_width = 150
@@ -690,7 +692,6 @@ class SupportApp:
         padding = 5
         max_colunas = 8
         bots_por_coluna = 10
-
         # Filtra textos por categoria
         filtered_texts = self.texts
         if self.current_category != "Todas":
@@ -699,7 +700,8 @@ class SupportApp:
                 for text in self.texts
                 if len(text) >= 3 and text[2] == self.current_category
             ]
-
+        # Map from filtered_texts index to self.texts index
+        filtered_indices = [self.texts.index(item) for item in filtered_texts]
         for idx, text_item in enumerate(filtered_texts):
             # Garante que text_item sempre tenha 3 elementos
             if len(text_item) == 2:
@@ -707,22 +709,12 @@ class SupportApp:
                 category = "Geral"
             else:
                 text, resumo, category = text_item
-
-            # Calcula coluna e linha conforme sistema anterior
-            col = idx // bots_por_coluna  # Cada coluna tem 10 botões
-            linha = idx % bots_por_coluna  # 0-9
-
-            # Para após atingir o máximo de colunas
+            col = idx // bots_por_coluna
+            linha = idx % bots_por_coluna
             if col >= max_colunas:
                 break
-
-            # Posição X baseada na coluna (cada coluna tem 100 + 25 + 10 = 135 de largura)
             x = start_x + (col * 185)
-
-            # Posição Y baseada na linha
             y = start_y + (linha * (button_height + padding))
-
-            # Botão principal
             btn = ttk.Button(
                 self.canvas,
                 text=resumo,
@@ -732,10 +724,19 @@ class SupportApp:
                 x, y, anchor="nw", window=btn, width=button_width, height=button_height
             )
             self.button_windows.append(btn_window)
-
-            # Tooltip mostrando a categoria
             Tooltip(btn, f"Categoria: {category}")
-
+            # --- Drag-and-drop bindings ---
+            if self.drag_mode:
+                # Only allow drag for main buttons (not edit buttons)
+                btn.bind(
+                    "<ButtonPress-1>",
+                    lambda e, i=idx: self._on_drag_start(e, i, filtered_indices),
+                )
+                btn.bind("<B1-Motion>", self._on_drag_motion)
+                btn.bind(
+                    "<ButtonRelease-1>",
+                    lambda e, i=idx: self._on_drag_release(e, i, filtered_indices),
+                )
             # Botão de edição
             if self.config["show_edit_buttons"]:
                 edit_btn = ttk.Button(
@@ -747,7 +748,7 @@ class SupportApp:
                     ),
                 )
                 edit_window = self.canvas.create_window(
-                    x + button_width + 5,  # Posição ao lado do botão principal
+                    x + button_width + 5,
                     y,
                     anchor="nw",
                     window=edit_btn,
@@ -755,12 +756,63 @@ class SupportApp:
                     height=button_height,
                 )
                 self.button_windows.append(edit_window)
-
-        # Atualizar scrollregion
         total_colunas = min(len(filtered_texts) // bots_por_coluna + 1, max_colunas)
         total_width = start_x + (total_colunas * 185)
         total_height = start_y + (bots_por_coluna * (button_height + padding))
         self.canvas.config(scrollregion=(0, 0, total_width, total_height))
+
+    # --- Drag-and-drop handlers ---
+    def _on_drag_start(self, event, idx, filtered_indices):
+        widget = event.widget
+        self._drag_data["widget"] = widget
+        self._drag_data["start_idx"] = idx
+        self._drag_data["filtered_indices"] = filtered_indices
+        # Visual feedback: lift the button
+        widget.lift()
+
+    def _on_drag_motion(self, event):
+        widget = self._drag_data["widget"]
+        if widget:
+            # Optionally, show a floating label or highlight
+            pass  # Visual feedback can be added here
+
+    def _on_drag_release(self, event, idx, filtered_indices):
+        widget = self._drag_data["widget"]
+        start_idx = self._drag_data["start_idx"]
+        if widget is None or start_idx is None:
+            return
+        # Calculate new index based on mouse position
+        x = event.x_root - self.root.winfo_rootx()
+        y = event.y_root - self.root.winfo_rooty()
+        # Find which button position is closest
+        start_x, start_y = 10, 10
+        button_width = 150
+        button_height = 30
+        padding = 5
+        max_colunas = 8
+        bots_por_coluna = 10
+        col = max(0, min((x - start_x) // 185, max_colunas - 1))
+        linha = max(
+            0, min((y - start_y) // (button_height + padding), bots_por_coluna - 1)
+        )
+        new_idx = int(col * bots_por_coluna + linha)
+        filtered_len = len(filtered_indices)
+        if new_idx >= filtered_len:
+            new_idx = filtered_len - 1
+        # Only reorder if position changed
+        if new_idx != start_idx:
+            orig_idx = filtered_indices[start_idx]
+            # Remove and insert in self.texts
+            item = self.texts.pop(orig_idx)
+            # If moving down, adjust for pop
+            if new_idx > start_idx:
+                insert_at = filtered_indices[new_idx]
+            else:
+                insert_at = filtered_indices[new_idx]
+            self.texts.insert(insert_at, item)
+            self.text_manager.save_texts()
+        self.refresh_gui()
+        self._drag_data = {"widget": None, "start_idx": None, "drag_window": None}
 
     def copy_to_clipboard(self, text):
         self.root.clipboard_clear()
@@ -956,6 +1008,15 @@ class SupportApp:
                 else "Exibir Bloco de Notas"
             ),
             command=self.toggle_notepad,
+        )
+        # --- Drag mode toggle ---
+        self.view_menu.add_command(
+            label=(
+                "Ativar arrastar botões"
+                if not self.drag_mode
+                else "Desativar arrastar botões"
+            ),
+            command=self.toggle_drag_mode,
         )
         self.view_menu.add_separator()
         # Movendo "Novo Botão" para o menu Visual
@@ -1774,6 +1835,20 @@ class SupportApp:
         for tag in tags:
             self.notepad_text.tag_add(tag["tag"], tag["start"], tag["end"])
 
+    def _restore_notepad_content(self, text, tags):
+        """Restaura o conteúdo e as tags do bloco de notas (usado no refresh_gui)."""
+        if not hasattr(self, "notepad_text"):
+            return
+        self.notepad_text.delete("1.0", tk.END)
+        self.notepad_text.insert(tk.END, text)
+        # Remove todas as tags existentes
+        for tag in self.notepad_text.tag_names():
+            if tag != "sel":
+                self.notepad_text.tag_remove(tag, "1.0", tk.END)
+        # Aplica as tags recebidas
+        for tag in tags:
+            self.notepad_text.tag_add(tag["tag"], tag["start"], tag["end"])
+
     def add_separator(self):
         self.notepad_text.insert(tk.END, "\n______________________\n")
 
@@ -1871,6 +1946,20 @@ class SupportApp:
             fg_color = self.get_contrast_color(self.config["bg_color"])
             self.notepad_text.configure(insertbackground=fg_color)
 
+    def toggle_drag_mode(self):
+        self.drag_mode = not self.drag_mode
+        # Atualiza o label do menu
+        idx = 4  # Posição do item no menu Visual
+        self.view_menu.entryconfig(
+            idx,
+            label=(
+                "Ativar arrastar botões"
+                if not self.drag_mode
+                else "Desativar arrastar botões"
+            ),
+        )
+        self.refresh_gui()
+
 
 class SnakeGame:
     """
@@ -1934,7 +2023,7 @@ class SnakeGame:
         # Bind de teclas
         self.master.bind("<w>", self.up)
         self.master.bind("<a>", self.left)
-        self.master.bind("<s>", self.down)
+        self.master.bind(" ", self.down)
         self.master.bind("<d>", self.right)
         self.master.bind("<space>", self.toggle_pause)
 
