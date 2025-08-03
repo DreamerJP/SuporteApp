@@ -1,1 +1,1 @@
-{"bg_image_path": "background.png", "sound_enabled": false, "bg_color": "#533d71", "show_edit_buttons": false, "window_size_normal": "552x365+1325+94", "window_size_notepad": "379x747+1494+92", "notepad_expanded": false, "last_bg_image_path": "background.png", "last_bg_color": "#FFFFFF"}
+{"bg_image_path": "background.png", "sound_enabled": false, "bg_color": "#533d71", "show_edit_buttons": false, "window_size_normal": "581x379+1294+37", "window_size_notepad": "574x747+1299+92", "notepad_expanded": false, "last_bg_image_path": "background.png", "last_bg_color": "#FFFFFF"}
