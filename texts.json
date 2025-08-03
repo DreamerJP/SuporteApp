@@ -10,7 +10,7 @@
         "Inicio atendimento"
     ],
     [
-        "Entendi.\nUm momento por favor que estou verificando.\nDurante a verificação a conexão poderá cair por alguns segundos.",
+        "Entendi.\nUm momento por favor que estou verificando.\nDurante a verificação a conexão poderá cair por um breve período.",
         "Verificando conexão",
         "Inicio atendimento"
     ],
@@ -30,6 +30,11 @@
         "Inicio atendimento"
     ],
     [
+        "Você tem notado esse problema em geral, ou apenas ao acessar algum site, aplicativo ou dispositivo específico?",
+        "Lentidão Geral?",
+        "Inicio atendimento"
+    ],
+    [
         "Por gentileza, qual o CPF do titular?",
         "Pedir CPF",
         "Inicio atendimento"
@@ -45,9 +50,9 @@
         "Inicio atendimento"
     ],
     [
-        "Havendo algo mais para auxiliarmos, por favor entre em contato novamente.\nTenha um ótimo dia! 😀",
-        "Encerrar Atendimento",
-        "Fim atendimento"
+        "Nesse momento há (    )   dispositivos conectados todos na mesma rede Wi-Fi 2.4Ghz.\nO ideal quando são muitos dispositivos, é separar entre as conexões disponíveis do roteador, para nenhuma rede ficar sobrecarregada.\nO roteado conta com 3 métodos de conexão:\n\n1 - Via cabo, mais indicado para TV's, computadores, ou dispositivos fixo.\n2 - Rede Wi-Fi 2.4Ghz, indicado para celulares que constantemente vão para os cômodos mais distantes.\n3 - Rede Wi-Fi 5Ghz, indicado para celulares próximos ao roteador. \n\nOferecemos cabo de rede de até 1 metro gratuitamente aqui na loja, e vendemos cabos maiores (necessário reservar).\nAlém disso temos disponível o serviço de passagem de cabo de rede de um cômodo para outro (Por ser um serviço extra há um custo).",
+        "WiFi sobrecarregado",
+        "Geral"
     ],
     [
         "Identifiquei que a conexão está bloqueada. Um momento por favor, que transferirei ao setor responsável.",
@@ -58,6 +63,16 @@
         "Um momento por favor, que transferirei ao setor responsável.",
         "Transferir",
         "Inicio atendimento"
+    ],
+    [
+        "Por gentileza, pode me confirmar seu endereço, e também a nova senha que quer colocar?\nÉ necessário que a nova senha tenha no mínimo 8 caracteres.",
+        "Nova senha WiFi",
+        "Inicio atendimento"
+    ],
+    [
+        "Pronto, a senha foi alterada! 👍😀\nAjudo em algo mais neste momento?",
+        "Senha alterada",
+        "Fim atendimento"
     ],
     [
         "Nesse caso ofereço uma visita técnica para verificação dos equipamentos de internet, e o local em que eles estão instalados.\nAlgumas vezes o aparelho pode estar instalado em um local que não propaga bem o sinal Wi-Fi e outros cômodos podem não chegar o sinal.\nAssim o técnico pode recomendar as opções, que seria a troca dos equipamentos de local, a instalação de um ponto adicional, ou se for um problema no próprio roteador ele já realiza o reparo.\n\nA visita técnica não tem custo, e caso seja identificado um problema nos equipamentos realizaremos o reparo também sem custo.\nJá os serviços de instalação de um ponto adicional, e mudança dos equipamentos de local, tem um custo.\nSe o técnico identificar a necessidade ele vai lhe indicar, assim caso aprove, podemos agendar uma visita para realizar o serviço.",
@@ -80,8 +95,28 @@
         "Geral"
     ],
     [
+        "Bom dia! 😀\nDesculpe não ter respondido ainda ontem, meu turno de atendimento já havia se encerrado.",
+        "Resposta de manha.",
+        "Inicio atendimento"
+    ],
+    [
+        "Para trocar os equipamentos de cômodo precisamos refazer parte da instalação.\nEste é um serviço extra e tem um custo de R$50,00 referente ao chamado.\nCaso o cabeamento da fibra não alcance o novo local, será necessário refazer a instalação toda por completo, trocando o cabeamento da fibra, assim o valor total fica em R$100,00.\n\nTenho vaga mais próxima disponível para sexta-feira no período da tarde.\nGostaria de agendar a visita?",
+        "Troca de comodo",
+        "Geral"
+    ],
+    [
         "Devido ao termino do meu turno, estou encerrando este atendimento, a fim de que outro técnico possa lhe atender, caso você precise.\nHavendo algo mais para auxiliarmos por favor entre em contato novamente.\nTenha uma ótima noite! 😀",
         "Fim de turno",
+        "Fim atendimento"
+    ],
+    [
+        "Combinado, a visita está agendada! 😁👍",
+        "Visita agendada",
+        "Fim atendimento"
+    ],
+    [
+        "Havendo algo mais para auxiliarmos, por favor entre em contato novamente.\nTenha um ótimo dia! 😀",
+        "Encerrar Atendimento",
         "Fim atendimento"
     ],
     [
@@ -90,33 +125,18 @@
         "Fim atendimento"
     ],
     [
-        "Por gentileza, pode me confirmar seu endereço, e também a nova senha que quer colocar?\nÉ necessário que a nova senha tenha no mínimo 8 caracteres.",
-        "Nova senha WiFi",
-        "Inicio atendimento"
-    ],
-    [
-        "Combinado, a visita está agendada! 😁👍",
-        "Visita agendada",
-        "Fim atendimento"
-    ],
-    [
-        "Bom dia! 😀\nDesculpe não ter respondido ainda ontem, meu turno de atendimento já havia se encerrado.",
-        "Resposta de manha.",
-        "Inicio atendimento"
-    ],
-    [
-        "Pronto, a senha foi alterada! 👍😀\nAjudo em algo mais neste momento?",
-        "Senha alterada",
-        "Fim atendimento"
-    ],
-    [
-        "Para trocar os equipamentos de cômodo precisamos refazer parte da instalação.\nEste é um serviço extra e tem um custo de R$50,00 referente ao chamado.\nCaso o cabeamento da fibra não alcance o novo local, será necessário refazer a instalação toda por completo, trocando o cabeamento da fibra, assim o valor total fica em R$100,00.\n\nTenho vaga mais próxima disponível para sexta-feira no período da tarde.\nGostaria de agendar a visita?",
-        "Troca de comodo",
+        "Nós somos como a companhia de água, fornecemos a água até um ponto da casa (que seria o nosso roteador). A partir daí, se você quer água no banheiro lá do fundo, no segundo andar, ou no quintal, você precisa de um encanador para fazer a tubulação interna da sua casa.\n\nA internet funciona igual:\n\nNós entregamos a internet até o roteador que instalamos\nNosso roteador é de boa qualidade, mas mesmo assim não conseguimos garantir que o sinal Wi-Fi chegue em todos os cantos da casa - isso depende do tamanho, paredes, interferências...\nSe o sinal não chega no quarto, escritório ou quintal, isso é problema da rede interna da sua casa.\nPara te ajudar nesses casos, oferecemos alguns serviços extras:\n\nInstalação de um roteador adicional\nPassagem de cabo de rede até algum dispositivo específico\nSão serviços básicos para resolver os problemas mais comuns\nPara soluções mais complexas, você precisa:\n\nContratar um técnico especializado em redes/TI\nEle pode fazer um projeto completo: repetidores, pontos de acesso, cabeamento estruturado.",
+        "Contratar Empresa de TI",
         "Geral"
     ],
     [
-        "Nesse momento há (    )   dispositivos conectados todos na mesma rede Wi-Fi 2.4Ghz.\nO ideal quando são muitos dispositivos, é separar entre as conexões disponíveis do roteador, para nenhuma rede ficar sobrecarregada.\nO roteado conta com 3 métodos de conexão:\n\n1 - Via cabo, mais indicado para TV's, computadores, ou dispositivos fixo.\n2 - Rede Wi-Fi 2.4Ghz, indicado para celulares que constantemente vão para os cômodos mais distantes.\n3 - Rede Wi-Fi 5Ghz, indicado para celulares próximos ao roteador. \n\nOferecemos cabo de rede de até 1 metro gratuitamente aqui na loja, e vendemos cabos maiores (necessário reservar).\nAlém disso temos disponível o serviço de passagem de cabo de rede de um cômodo para outro (Por ser um serviço extra há um custo).",
-        "WiFi sobrecarregado",
+        "Oferecemos cabo de rede de até 1 metro gratuitamente para retirada aqui na loja.\nTambém vendemos cabos maiores por metro (necessário reservar).\nAlém disso caso tenha interesse, temos um serviço especial de passagem de cabo de rede de um cômodo a outro.",
+        "Cabo rede loja",
+        "Geral"
+    ],
+    [
+        "Também tenho algumas recomendações de uso:\n\nNesse momento, todos os seus 4 dispositivos estão conectados à rede Wi-Fi 2,4 GHz ( ). Isso pode sobrecarregar a rede. O ideal é dividir os dispositivos conectados entre as opções de conexão disponíveis no roteador.\n\nO roteador oferece três métodos de conexão para seus dispositivos:\n\n*Conexão via cabo de rede:* Indicada para TVs, computadores, TV BOX e outros dispositivos compatíveis. Conectar um dispositivo diretamente via cabo é sempre a melhor opção, por ser muito mais estável que o Wi-Fi e deixa a rede Wi-Fi mais livre para os outros dispositivos.\n\n*Conexão via Wi-Fi 5 GHz:* Indicada para dispositivos que não podem ser conectados via cabo e que estão no mesmo cômodo que o roteador. É mais rápida que o Wi-Fi comum, mas tem alcance menor.\n\n*Conexão via Wi-Fi 2,4 GHz:* Indicada para dispositivos que não podem ser conectados via cabo e que estão mais distantes do roteador (em outros cômodos).  Essa rede tem maior alcance, mas não suporta tanta velocidade.",
+        "Muitos disp. mesma rede",
         "Geral"
     ]
 ]
