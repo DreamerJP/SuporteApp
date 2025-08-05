@@ -2023,7 +2023,7 @@ class SnakeGame:
         # Bind de teclas
         self.master.bind("<w>", self.up)
         self.master.bind("<a>", self.left)
-        self.master.bind(" ", self.down)
+        self.master.bind("<s>", self.down)
         self.master.bind("<d>", self.right)
         self.master.bind("<space>", self.toggle_pause)
 
