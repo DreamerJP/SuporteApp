@@ -23,9 +23,9 @@ O desenvolvimento da versão desktop (Windows `.exe`) foi oficialmente **encerra
 - IP Opener nativo e configurável.
 - Sistema de abas por categoria.
 
-### <h1>Versão 3.5:</h1>
+### <h1>Versão 3.6:</h1>
 
-![SuporteApp3.5](https://github.com/user-attachments/assets/b34a941f-8dbc-4a78-a90a-aa022cc72425)
+![SuporteApp3.6](https://github.com/user-attachments/assets/2025a806-b37f-473c-afc2-7c4062177e5f5)
 
 ### <h1>Versão 1.0:</h1>
 
