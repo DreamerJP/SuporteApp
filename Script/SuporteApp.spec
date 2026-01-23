@@ -5,7 +5,7 @@ a = Analysis(
     ['SuporteApp.py'],
     pathex=[],
     binaries=[],
-    datas=[('ico.ico', '.')],
+    datas=[('ico.ico', '.'), ('click.wav', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

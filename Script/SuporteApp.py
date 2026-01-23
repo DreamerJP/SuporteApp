@@ -5,12 +5,13 @@ Contém funcionalidades para atualização automática, gerenciamento de configu
 
 import os
 import sys
+import ttkbootstrap as ttk
+
 import tkinter as tk
 from tkinter import (
     simpledialog,
     scrolledtext,
     filedialog,
-    ttk,
     messagebox,
     colorchooser,
 )
@@ -23,6 +24,15 @@ import requests
 import time
 import shutil
 import traceback
+import webbrowser
+import re
+import threading
+from typing import Optional, Dict, List, Tuple, Any
+
+try:
+    import keyboard
+except ImportError:
+    keyboard = None
 
 
 def get_resource_path(relative_path):
@@ -101,7 +111,7 @@ class Updater:
             "https://raw.githubusercontent.com/DreamerJP/SuporteApp/main/version.json"
         )
 
-    def check_for_updates(self):
+    def check_for_updates(self) -> Optional[Dict[str, Any]]:
         """
         Verifica se há uma nova versão consultando a URL definida.
 
@@ -119,7 +129,7 @@ class Updater:
             print(f"Erro ao verificar atualizações: {e}")
             return None
 
-    def download_and_install(self, download_url):
+    def download_and_install(self, download_url: str) -> None:
         """
         Faz o download do novo executável, cria e valida o script BAT para substituição e reinicia o aplicativo.
 
@@ -273,8 +283,11 @@ class ConfigManager:
             "notepad_expanded": True,
             "last_bg_image_path": DEFAULT_BG_IMAGE_PATH,
             "last_bg_color": DEFAULT_BG_COLOR,
+            "ip_opener_enabled": True,
+            "ip_opener_hotkey": "page down",
+            "ip_opener_ports": ["8081"],
         }
-        self.config = self.load_config()
+        self.config: Dict[str, Any] = self.load_config()
 
     def load_config(self):
         """
@@ -312,7 +325,7 @@ class TextManager:
         # Dicionário para armazenar as categorias
         self.categories = self.extract_categories()
 
-    def load_texts(self):
+    def load_texts(self) -> List[Tuple[str, str, str]]:
         """
         Carrega os textos do arquivo ou retorna uma lista padrão.
 
@@ -419,7 +432,7 @@ class NotepadManager:
                 return "", []
         return "", []
 
-    def save_notepad(self, content, tags):
+    def save_notepad(self, content: str, tags: List[Any]) -> None:
         """
         Salva o conteúdo e as tags (formatações) no arquivo referente ao bloco de notas.
 
@@ -499,7 +512,7 @@ class SupportApp:
         except Exception as e:
             print(f"Icone não carregado: {e}")
 
-        self.current_version = "3.5"
+        self.current_version = "3.6 Final"
         self.updater = Updater(self.current_version)
         self.check_updates()
 
@@ -536,19 +549,19 @@ class SupportApp:
         self.drag_mode = False
         self._drag_data = {"widget": None, "start_idx": None, "drag_window": None}
 
+        # Inicializa o IP Opener (Hotkey)
+        self.ip_opener_var = tk.BooleanVar(
+            value=self.config.get("ip_opener_enabled", True)
+        )
+        self.setup_ip_opener()
+
         self.setup_ui()
-        pygame.mixer.init()
+        self.audio_available = False
         self.click_sound = None
-        self.load_sound()
+        self.initialize_audio()
 
         # Inicializa pilhas de undo
         self.undo_stack = []
-        self.user_script = ""  # Armazena o script do usuário
-        # Define o arquivo para salvar o script (na mesma pasta do executável)
-        self.script_file = os.path.join(
-            os.path.dirname(sys.executable), "user_script.py"
-        )
-        self.load_user_script()
 
     def initialize_audio(self):
         """Inicializa o sistema de áudio com fallback e logging apropriado."""
@@ -556,46 +569,98 @@ class SupportApp:
         self.click_sound = None
 
         if not self.config["sound_enabled"]:
-            print("Som desativado nas configurações.")
+            print("[ÁUDIO] Som desativado nas configurações.")
             return
 
         try:
             pygame.mixer.quit()  # Garante que não há instância anterior
             pygame.mixer.init()
             self.audio_available = True
-            print("Sistema de áudio inicializado com sucesso.")
+            print("[ÁUDIO] Sistema de áudio inicializado com sucesso.")
 
             try:
-                self.click_sound = pygame.mixer.Sound("click.wav")
-                print("Som de clique carregado com sucesso.")
+                sound_path = get_resource_path("click.wav")
+                print(f"[ÁUDIO] Carregando som de: {sound_path}")
+                self.click_sound = pygame.mixer.Sound(sound_path)
+                print(
+                    f"[ÁUDIO] Som carregado com sucesso! Duração: {self.click_sound.get_length():.3f}s"
+                )
             except Exception as e:
-                print(f"Aviso: Não foi possível carregar o som de clique: {e}")
+                print(f"[ÁUDIO] Aviso: Não foi possível carregar o som de clique: {e}")
                 self.audio_available = False
 
         except Exception as e:
-            print(f"Aviso: Sistema de áudio não disponível: {e}")
+            print(f"[ÁUDIO] Aviso: Sistema de áudio não disponível: {e}")
             self.config["sound_enabled"] = False
             self.config_manager.save_config()
-            print("Som desativado automaticamente devido a problemas de inicialização.")
+            print(
+                "[ÁUDIO] Som desativado automaticamente devido a problemas de inicialização."
+            )
 
-    def check_updates(self):
+    def check_updates(self) -> None:
         """
-        Verifica e notifica sobre atualizações disponíveis chamando o Updater.
+        Verifica e notifica sobre atualizações disponíveis em uma thread separada.
         """
-        version_info = self.updater.check_for_updates()
+        threading.Thread(target=self._run_update_check, daemon=True).start()
+
+    def _run_update_check(self) -> None:
+        """Executa a verificação de atualização em background."""
+        try:
+            version_info = self.updater.check_for_updates()
+            if version_info:
+                # Retorna para a thread principal para exibir a UI
+                self.root.after(0, self._prompt_update, version_info)
+        except Exception as e:
+            print(f"Erro na verificação de atualização (thread): {e}")
+
+    def _prompt_update(self, version_info: Dict[str, Any]) -> None:
+        """Exibe o prompt de atualização na thread principal."""
+        if messagebox.askyesno(
+            "Atualização Disponível",
+            f"Uma nova versão ({version_info['version']}) está disponível. Deseja atualizar agora?",
+        ):
+            # O download também pode ser movido para thread se desejado,
+            # mas como vai fechar o app, pode ser síncrono.
+            self.updater.download_and_install(version_info["download_url"])
+
+    def check_for_updates_manual(self) -> None:
+        """Verifica atualizações manualmente (com feedback visual)."""
+        threading.Thread(target=self._run_manual_update_check, daemon=True).start()
+
+    def _run_manual_update_check(self) -> None:
+        """Executa a verificação manual em background."""
+        try:
+            version_info = self.updater.check_for_updates()
+            self.root.after(0, self._handle_manual_update_result, version_info)
+        except Exception as e:
+            print(f"Erro na verificação manual: {e}")
+            error_msg = str(e)
+            self.root.after(
+                0,
+                lambda: messagebox.showerror(
+                    "Erro", f"Erro ao verificar atualizações: {error_msg}"
+                ),
+            )
+
+    def _handle_manual_update_result(
+        self, version_info: Optional[Dict[str, Any]]
+    ) -> None:
+        """Lida com o resultado da verificação manual na thread principal."""
         if version_info:
-            if messagebox.askyesno(
-                "Atualização Disponível",
-                f"Uma nova versão ({version_info['version']}) está disponível. Deseja atualizar agora?",
-            ):
-                self.updater.download_and_install(version_info["download_url"])
+            self._prompt_update(version_info)
+        else:
+            messagebox.showinfo(
+                "SuporteApp",
+                f"Você já está usando a versão mais recente ({self.current_version}).",
+            )
 
     def load_sound(self):
         """
         Inicializa o som para clique dos botões (usando pygame) e trata falhas de carregamento.
         """
         try:
-            self.click_sound = pygame.mixer.Sound("click.wav")
+            sound_path = get_resource_path("click.wav")
+            self.click_sound = pygame.mixer.Sound(sound_path)
         except Exception as e:
             print(f"Erro ao carregar som: {e}")
             self.config["sound_enabled"] = False
@@ -604,14 +669,24 @@ class SupportApp:
     def setup_ui(self):
         """Configura a interface gráfica (UI), criando canvas, botões, menus e blocos de notas."""
         self.root.configure(bg=self.config["bg_color"])
+
+        # Criar container principal para abas
+        self.main_container = ttk.Frame(self.root)
+        self.main_container.pack(fill="both", expand=True)
+
+        # Criar sistema de abas
+        self.create_tabs()
+
+        # Criar canvas, carregar imagem e criar botões
         self.create_canvas()
         self.load_bg_image()
         self.create_buttons()
+
+        # Criar menu e bloco de notas
         self.create_menu()
         self.create_notepad_widget()
         self.root.bind("<Configure>", self.save_window_size)
         self.style = ttk.Style()
-        self.style.theme_use("clam")
         self.update_button_styles()
 
     def save_window_size(self, event):
@@ -633,8 +708,44 @@ class SupportApp:
                 self.config["window_size_normal"] = current_geometry
             self.config_manager.save_config()
 
+    def create_tabs(self):
+        """Cria o sistema de abas para navegação entre categorias."""
+        self.notebook = ttk.Notebook(self.main_container)
+        self.notebook.pack(fill="x", padx=5, pady=5)
+
+        # Criar aba "Todas"
+        self.create_single_tab("Todas")
+
+        # Criar aba para cada categoria
+        for category in self.text_manager.categories:
+            self.create_single_tab(category)
+
+        # Bind para detectar mudança de aba
+        self.notebook.bind("<<NotebookTabChanged>>", self.on_tab_changed)
+
+    def create_single_tab(self, name):
+        """Cria uma aba individual (sem widgets, só placeholder)."""
+        tab = ttk.Frame(self.notebook)
+        self.notebook.add(tab, text=f"  {name}  ")
+
+    def on_tab_changed(self, event=None):
+        """Detecta mudança de aba e filtra botões."""
+        selected_tab = self.notebook.tab(self.notebook.index("current"), "text").strip()
+        self.current_category = selected_tab
+        # Apenas recria botões, não toda a GUI
+        self.create_buttons()
+
+    def rebuild_tabs(self):
+        """Reconstrói todas as abas após mudanças nas categorias."""
+        # Destroi o notebook existente
+        if hasattr(self, "notebook"):
+            self.notebook.destroy()
+
+        # Recriar as abas
+        self.create_tabs()
+
     def create_canvas(self):
-        self.canvas = tk.Canvas(self.root, bg=self.config["bg_color"])
+        self.canvas = tk.Canvas(self.main_container, bg=self.config["bg_color"])
         self.canvas.pack(fill="both", expand=True)
 
     def load_bg_image(self):
@@ -741,7 +852,7 @@ class SupportApp:
             if self.config["show_edit_buttons"]:
                 edit_btn = ttk.Button(
                     self.canvas,
-                    text="✎",
+                    text="✏️",
                     width=2,
                     command=lambda i=self.texts.index(text_item): self.open_edit_window(
                         i
@@ -786,7 +897,7 @@ class SupportApp:
         y = event.y_root - self.root.winfo_rooty()
         # Find which button position is closest
         start_x, start_y = 10, 10
-        button_width = 150
+
         button_height = 30
         padding = 5
         max_colunas = 8
@@ -821,12 +932,22 @@ class SupportApp:
         # Reproduz som apenas se o sistema de áudio estiver disponível
         if self.config["sound_enabled"] and self.audio_available and self.click_sound:
             try:
-                pygame.mixer.find_channel(True).play(self.click_sound)
+                channel = pygame.mixer.find_channel(True)
+                if channel:
+                    channel.play(self.click_sound)
+                    print(f"[ÁUDIO] Som tocando no canal: {channel}")
+                else:
+                    print("[ÁUDIO] Nenhum canal disponível")
             except Exception as e:
-                print(f"Erro ao reproduzir som: {e}")
-                self.audio_available = (
-                    False  # Desativa o áudio se ocorrer erro durante a reprodução
-                )
+                print(f"[ÁUDIO] Erro ao reproduzir som: {e}")
+                self.audio_available = False
+        else:
+            if not self.config["sound_enabled"]:
+                print("[ÁUDIO] Som desativado nas configurações")
+            elif not self.audio_available:
+                print("[ÁUDIO] Sistema de áudio não disponível")
+            elif not self.click_sound:
+                print("[ÁUDIO] click_sound não carregado")
 
     def open_edit_window(self, idx):
         edit_window = tk.Toplevel(self.root)
@@ -1048,19 +1169,27 @@ class SupportApp:
         # Sub-menu para selecionar categorias
         self.update_category_menu()
 
-        # Adiciona um separador visual no menu (usando cascade vazio com um label de separador)
-        menu_bar.add_cascade(label="│", state="disabled")
-
-        # Botões de Script diretamente na barra de menu (sem submenu)
-        menu_bar.add_command(label="Script", command=self.execute_script)
-        menu_bar.add_command(label="✎", command=self.edit_script)
-
-        # Adiciona outro separador visual
-        menu_bar.add_cascade(label="│", state="disabled")
+        # Menu "Ferramentas"
+        self.tools_menu = tk.Menu(menu_bar, tearoff=0)
+        menu_bar.add_cascade(label="Ferramentas", menu=self.tools_menu)
+        self.tools_menu.add_checkbutton(
+            label="Ativar Abertura de IP (Hotkey)",
+            variable=self.ip_opener_var,
+            command=self.toggle_ip_opener,
+        )
+        self.tools_menu.add_command(
+            label="Configurar Tecla de Atalho", command=self.configure_ip_hotkey
+        )
+        self.tools_menu.add_command(
+            label="Configurar Portas Extras", command=self.configure_ip_ports
+        )
 
         # Menu "Ajuda" - Movido para o final
         help_menu = tk.Menu(menu_bar, tearoff=0)
         menu_bar.add_cascade(label="Ajuda", menu=help_menu)
+        help_menu.add_command(
+            label="Verificar Atualizações", command=self.check_for_updates_manual
+        )
         help_menu.add_command(label="Sobre", command=self.show_about)
 
     def update_category_menu(self):
@@ -1100,6 +1229,8 @@ class SupportApp:
         )
         if new_category and new_category.strip():
             if self.text_manager.add_category(new_category.strip()):
+                # Reconstruir as abas com a nova categoria
+                self.rebuild_tabs()
                 self.update_category_menu()
                 messagebox.showinfo(
                     "Sucesso", f"Categoria '{new_category}' adicionada com sucesso!"
@@ -1153,6 +1284,9 @@ class SupportApp:
                         for category in self.text_manager.categories:
                             categories_listbox.insert(tk.END, category)
 
+                        # Reconstrói as abas
+                        self.rebuild_tabs()
+
                         # Atualiza o menu de categorias
                         self.update_category_menu()
                         messagebox.showinfo(
@@ -1184,6 +1318,9 @@ class SupportApp:
                         for category in self.text_manager.categories:
                             categories_listbox.insert(tk.END, category)
 
+                        # Reconstrói as abas
+                        self.rebuild_tabs()
+
                         # Atualiza o menu de categorias
                         self.update_category_menu()
 
@@ -1209,82 +1346,223 @@ class SupportApp:
             side=tk.RIGHT, padx=5
         )
 
-    def execute_script(self):
-        # Executa o script armazenado no self.user_script em um novo processo Python do sistema, sem abrir janela de CMD e sem travar o app principal
-        if self.user_script.strip() == "":
-            messagebox.showinfo("Script vazio", "Nenhum script foi definido.")
+    # --- Funcionalidades do IP Opener ---
+
+    def setup_ip_opener(self):
+        """Configura o listener de hotkey para abertura de IPs."""
+        if not keyboard:
+            print("[IP OPENER] Biblioteca 'keyboard' não encontrada.")
             return
 
-        self.save_user_script()  # Garante que o script está salvo no arquivo
-
-        import shutil
-        import subprocess
-        import os
-
-        def find_system_python():
-            # Tenta encontrar o Python do sistema
-            for py in ("python.exe", "python3.exe", "python", "python3"):
-                path = shutil.which(py)
-                if path:
-                    return path
-            return None
-
-        python_path = find_system_python()
-        if not python_path:
-            messagebox.showerror(
-                "Python não encontrado",
-                "Não foi possível localizar o Python instalado no sistema. Instale o Python para executar scripts.",
-            )
-            return
-
-        # Define o creationflags para não abrir janela de CMD no Windows
-        creationflags = 0
-        if os.name == "nt":
-            creationflags = subprocess.CREATE_NO_WINDOW
-
+        # Remove hooks anteriores para evitar duplicação em recarregamentos
         try:
-            subprocess.Popen(
-                [python_path, self.script_file],
-                creationflags=creationflags,
-            )
-            # Opcional: mostrar mensagem de que o script foi iniciado
-            # messagebox.showinfo("Script", "Script iniciado em segundo plano.")
+            keyboard.unhook_all()
+        except Exception:
+            pass
+
+        if self.config.get("ip_opener_enabled", True):
+            hotkey = self.config.get("ip_opener_hotkey", "page down")
+            try:
+                keyboard.add_hotkey(hotkey, self.schedule_ip_check)
+                print(f"[IP OPENER] Hotkey ativado: {hotkey}")
+            except Exception as e:
+                print(f"[IP OPENER] Erro ao registrar hotkey '{hotkey}': {e}")
+                messagebox.showerror(
+                    "Erro no Atalho",
+                    f"Não foi possível registrar a tecla '{hotkey}'.\nVerifique se é válida.",
+                )
+
+    def schedule_ip_check(self):
+        """Agenda a verificação do clipboard na thread principal."""
+        self.root.after(0, self.check_and_open_ip)
+
+    def check_and_open_ip(self):
+        """Verifica o clipboard e abre os links se for um IP válido."""
+        try:
+            try:
+                content = self.root.clipboard_get().strip()
+            except tk.TclError:
+                # Clipboard vazio ou inacessível no momento
+                return
+
+            # Verifica padrão de IP (IPv4 simples)
+            ip_pattern = r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$"
+            if re.match(ip_pattern, content):
+                # Abre padrão HTTP/HTTPS
+                webbrowser.open(f"http://{content}")
+                webbrowser.open(f"https://{content}")
+
+                # Abre portas extras configuradas
+                extra_ports = self.config.get("ip_opener_ports", ["8081"])
+                for port in extra_ports:
+                    if str(port).strip():
+                        webbrowser.open(f"http://{content}:{port}")
+                        webbrowser.open(f"https://{content}:{port}")
+
+                print(f"[IP OPENER] IP detectado e aberto: {content}")
+
+                # Feedback sonoro opcional se áudio estiver ligado
+                if (
+                    self.config["sound_enabled"]
+                    and self.audio_available
+                    and self.click_sound
+                ):
+                    self.click_sound.play()
         except Exception as e:
-            messagebox.showerror("Erro na Execução", f"Ocorreu um erro: {e}")
+            print(f"[IP OPENER] Erro durante verificação: {e}")
 
-    def edit_script(self):
-        # Abre uma janela Toplevel para editar o script Python
-        editor = tk.Toplevel(self.root)
-        editor.title("Editor de Script Python")
-        editor.geometry("800x600")  # Tamanho maior verticalmente
-        st = scrolledtext.ScrolledText(editor, wrap=tk.WORD, font=("Courier New", 10))
-        st.pack(expand=True, fill="both", padx=10, pady=10)
-        st.insert(tk.END, self.user_script)  # Carrega o script atual
-        btn_frame = tk.Frame(editor)
-        btn_frame.pack(pady=5)
+    def toggle_ip_opener(self):
+        """Alterna o estado ativado/desativado do IP Opener."""
+        is_enabled = self.ip_opener_var.get()
+        self.config["ip_opener_enabled"] = is_enabled
+        self.config_manager.save_config()
+        self.setup_ip_opener()
 
-        def save_script():
-            self.user_script = st.get("1.0", tk.END)
-            self.save_user_script()  # Salva o script no arquivo
-            messagebox.showinfo("Script", "Script salvo com sucesso.")
+    def configure_ip_hotkey(self):
+        """Abre janela para detectar a tecla de atalho pressionada."""
+        if not keyboard:
+            messagebox.showerror("Erro", "Biblioteca 'keyboard' não disponível.")
+            return
 
-        ttk.Button(btn_frame, text="Salvar", command=save_script).pack(
+        current = self.config.get("ip_opener_hotkey", "page down")
+
+        # Janela de configuração
+        hotkey_window = tk.Toplevel(self.root)
+        hotkey_window.title("Configurar Atalho")
+        hotkey_window.geometry("350x200")
+        hotkey_window.resizable(False, False)
+        hotkey_window.grab_set()
+
+        # Labels
+        ttk.Label(hotkey_window, text=f"Atalho Atual: {current}").pack(pady=(15, 5))
+
+        status_label = ttk.Label(
+            hotkey_window,
+            text="Pressione a nova tecla...",
+            font=("Helvetica", 12, "bold"),
+            foreground="#0078D4",
+        )
+        status_label.pack(pady=10)
+
+        # Variável para armazenar o hotkey detectado
+        detected_hotkey = tk.StringVar(value="")
+
+        # Frame de botões
+        btn_frame = ttk.Frame(hotkey_window)
+        btn_frame.pack(side="bottom", pady=15)
+
+        save_btn = ttk.Button(btn_frame, text="Salvar", state="disabled")
+        save_btn.pack(side="left", padx=5)
+
+        cancel_btn = ttk.Button(
+            btn_frame, text="Cancelar", command=hotkey_window.destroy
+        )
+        cancel_btn.pack(side="left", padx=5)
+
+        # Flag para controlar a thread de escuta
+        self._listening_hotkey = True
+
+        def listen_for_hotkey():
+            """Função executada em thread para capturar o hotkey"""
+            try:
+                # Pequeno delay para evitar capturar o Enter/Click anterior
+                time.sleep(0.5)
+
+                while self._listening_hotkey:
+                    # Lê o hotkey (bloqueante)
+                    key = keyboard.read_hotkey(suppress=False)
+                    if key and self._listening_hotkey:
+                        # Atualiza UI na thread principal
+                        self.root.after(0, lambda k=key: update_ui(k))
+                        break
+            except Exception as e:
+                print(f"Erro na captura de teclas: {e}")
+
+        def update_ui(key):
+            """Atualiza a interface com a tecla detectada"""
+            if not hotkey_window.winfo_exists():
+                return
+
+            detected_hotkey.set(key)
+            status_label.configure(text=f"Detectado: {key}", foreground="green")
+            save_btn.configure(state="normal", command=lambda: save_hotkey(key))
+
+        def save_hotkey(key):
+            self.config["ip_opener_hotkey"] = key
+            self.config_manager.save_config()
+            self.setup_ip_opener()
+            self._listening_hotkey = False
+            hotkey_window.destroy()
+            messagebox.showinfo("Sucesso", f"Atalho atualizado para: {key}")
+
+        def on_close():
+            self._listening_hotkey = False
+            hotkey_window.destroy()
+
+        hotkey_window.protocol("WM_DELETE_WINDOW", on_close)
+
+        # Inicia a thread
+        threading.Thread(target=listen_for_hotkey, daemon=True).start()
+
+    def configure_ip_ports(self):
+        """Abre janela para gerenciar portas extras do IP Opener."""
+        ports_window = tk.Toplevel(self.root)
+        ports_window.title("Configurar Portas")
+        ports_window.geometry("300x400")
+
+        tk.Label(ports_window, text="Portas Adicionais (HTTP/HTTPS):").pack(pady=10)
+
+        listbox = tk.Listbox(ports_window)
+        listbox.pack(fill="both", expand=True, padx=10, pady=5)
+
+        current_ports = self.config.get("ip_opener_ports", ["8081"])
+        for port in current_ports:
+            listbox.insert(tk.END, port)
+
+        def add_port():
+            port = simpledialog.askstring(
+                "Adicionar Porta", "Digite o número da porta (ex: 8080):"
+            )
+            if port and port.strip().isdigit():
+                listbox.insert(tk.END, port.strip())
+                save_ports()
+            elif port:
+                messagebox.showerror("Erro", "Porta inválida, use apenas números.")
+
+        def remove_port():
+            selection = listbox.curselection()
+            if selection:
+                listbox.delete(selection)
+                save_ports()
+            else:
+                messagebox.showinfo("Info", "Selecione uma porta para remover.")
+
+        def save_ports():
+            ports = list(listbox.get(0, tk.END))
+            self.config["ip_opener_ports"] = ports
+            self.config_manager.save_config()
+
+        btn_frame = tk.Frame(ports_window)
+        btn_frame.pack(pady=10)
+
+        ttk.Button(btn_frame, text="Adicionar", command=add_port).pack(
+            side=tk.LEFT, padx=5
+        )
+        ttk.Button(btn_frame, text="Remover", command=remove_port).pack(
             side=tk.LEFT, padx=5
         )
 
-    def load_user_script(self):
-        # Carrega o script se o arquivo existir
-        if os.path.exists(self.script_file):
-            with open(self.script_file, "r", encoding="utf-8") as f:
-                self.user_script = f.read()
-
-    def save_user_script(self):
-        # Salva o conteúdo de user_script no arquivo
-        with open(self.script_file, "w", encoding="utf-8") as f:
-            f.write(self.user_script)
-
     def toggle_sound(self):
         self.config["sound_enabled"] = not self.config["sound_enabled"]
+        self.config_manager.save_config()
+
+        # Reinicializa o áudio quando ativa/desativa
+        if self.config["sound_enabled"]:
+            self.initialize_audio()
+        else:
+            self.click_sound = None
+            self.audio_available = False
+
         self.sound_menu.entryconfig(
             0,
             label=(
@@ -1293,7 +1571,6 @@ class SupportApp:
                 else "Ativar Som de Clique"
             ),
         )
-        self.config_manager.save_config()
 
     def toggle_edit_buttons(self):
         self.config["show_edit_buttons"] = not self.config["show_edit_buttons"]
@@ -1315,8 +1592,6 @@ class SupportApp:
         Parâmetros:
             no_save (bool): Se True, não salva o estado atual nas configurações.
         """
-        # Salvar estado anterior
-        prev_state = self.config["notepad_expanded"]
 
         # Alterna estado
         self.config["notepad_expanded"] = not self.config["notepad_expanded"]
@@ -1485,8 +1760,6 @@ class SupportApp:
         }
         url = links.get(text, "")
         if url:
-            import webbrowser
-
             webbrowser.open_new(url)
 
     def add_snake_emoji_easter_egg(self, window):
@@ -1631,7 +1904,7 @@ class SupportApp:
             r, g, b = tuple(int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
             luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
             return "white" if luminance < 0.5 else "black"
-        except:
+        except Exception:
             return "black"
 
     def adjust_color(self, hex_color, delta):
@@ -1650,7 +1923,7 @@ class SupportApp:
         notepad_bg_color = self.config["bg_color"]
         notepad_fg_color = self.get_contrast_color(notepad_bg_color)
 
-        default_font = ("Helvetica", 10)
+        default_font = ("Segoe UI Emoji", 10)
         self.notepad_text = scrolledtext.ScrolledText(
             self.notepad_frame,
             width=50,
@@ -1922,7 +2195,7 @@ class SupportApp:
             "TButton",
             background=bg_color,
             foreground=fg_color,
-            font=("Helvetica", 9),
+            font=("Segoe UI Emoji", 9),
             padding=3,
         )
 
@@ -1990,6 +2263,9 @@ class SnakeGame:
             bg="#0a0a2a",
             highlightthickness=0,
         )
+        # Força a aplicação das cores escuras após renderização do tema
+        self.master.after(100, lambda: self.master.configure(bg="black"))
+        self.master.after(100, lambda: self.canvas.configure(bg="#0a0a2a"))
         self.canvas.pack(
             fill="both", expand=False
         )  # Removido expand=True para manter tamanho fixo
@@ -2257,7 +2533,7 @@ class SnakeGame:
             # Se for a cabeça da cobra (último elemento)
             if i == len(self.snake) - 1:
                 # Olhos da cobra
-                eye_offset = 5
+
                 # Determina a posição dos olhos baseado na direção
                 if self.direction == "right":
                     eyes = [(x + 15, y + 5), (x + 15, y + 15)]
@@ -2295,7 +2571,15 @@ class SnakeGame:
             # Reflexo superior-esquerdo (efeito de luz)
             if i < len(self.snake) - 1 or self.direction in ["down", "right"]:
                 self.canvas.create_polygon(
-                    x, y, x + 6, y, x, y + 6, fill=glow_color, outline="", tag="snake"  # type: ignore
+                    x,
+                    y,
+                    x + 6,
+                    y,
+                    x,
+                    y + 6,
+                    fill=glow_color,
+                    outline="",
+                    tag="snake",  # type: ignore
                 )  # type: ignore
 
             # Padrão de escamas na cobra (linhas horizontais e verticais)
@@ -2358,12 +2642,25 @@ class SnakeGame:
 
         # Base do planeta (círculo principal)
         self.canvas.create_oval(
-            x, y, x + size, y + size, fill=base, outline=dark, width=2, tag="apple"  # type: ignore
+            x,
+            y,
+            x + size,
+            y + size,
+            fill=base,
+            outline=dark,
+            width=2,
+            tag="apple",  # type: ignore
         )  # type: ignore
 
         # Superfície do planeta (variação de cor)
         self.canvas.create_oval(
-            x + 4, y + 4, x + size - 4, y + size - 4, fill=mid, outline="", tag="apple"  # type: ignore
+            x + 4,
+            y + 4,
+            x + size - 4,
+            y + size - 4,
+            fill=mid,
+            outline="",
+            tag="apple",  # type: ignore
         )  # type: ignore
 
         # Crateras com efeito de profundidade
@@ -2393,7 +2690,7 @@ class SnakeGame:
             )  # type: ignore
 
         # Reflexo de luz na parte superior (brilho)
-        highlight_arc = self.canvas.create_arc(
+        self.canvas.create_arc(
             x + 3,
             y + 3,
             x + size - 3,
@@ -2840,7 +3137,7 @@ class SnakeGame:
                 self.canvas.create_text(
                     200,
                     y_position + 30 + (i * 30),
-                    text=f"{i+1}. {name}: {score}",
+                    text=f"{i + 1}. {name}: {score}",
                     font=("Arial", 14),
                     fill="white",
                 )
@@ -2872,6 +3169,7 @@ class SnakeGame:
 
 if __name__ == "__main__":
     cleanup_old_temp_dirs()  # Função de limpeza de pasta temporaria MEI na inicialização
-    root = tk.Tk()
+    # Inicializa com ttkbootstrap para estilo moderno
+    root = ttk.Window(themename="flatly")
     app = SupportApp(root)
     root.mainloop()
